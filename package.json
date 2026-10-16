@@ -1,0 +1,13 @@
+{
+  "name": "gerador-higgsfield",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Convenience npm scripts for the Rust Higgsfield Studio & CLI",
+  "scripts": {
+    "dev": "cargo run",
+    "start": "cargo run --release",
+    "build": "cargo build --release",
+    "seedance": "cargo run -- --seedance",
+    "test": "cargo test"
+  }
+}

@@ -1,0 +1,24 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# Environment files & secrets (never commit API keys)
+.env
+.env.local
+.env.*
+!.env.example
+
+# Local runtime state & generation history (never commit user history)
+.higgsfield_history.json
+.higgsfield_history*.json
+.DS_Store
+
+# Local media downloads / outputs
+/outputs/
+/downloads/
+*.mp4
+*.mov
+*.webm
+*.wav
+*.mp3
+

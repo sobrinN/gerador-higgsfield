@@ -1,0 +1,8 @@
+[package]
+name = "gerador-higgsfield"
+version = "0.1.0"
+edition = "2021"
+description = "Ultra-fast zero-dependency Rust local studio & CLI for the Higgsfield API (Seedance 2.5, Genjutsu, Soul V2, Soul ID, AI Influencer, and more)"
+
+[dependencies]
+# Zero external crates: compiles in <0.5s using pure Rust std + native macOS curl TLS.

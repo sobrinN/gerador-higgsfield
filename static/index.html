@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Higgsfield Studio · Motor Nativo em Rust</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Left Sidebar: Brand, Language Switcher, Credential Status, Category Filter & Model Catalog -->
+    <aside class="sidebar" aria-label="Catálogo de Modelos e Configuração de API">
+      <div class="brand-header">
+        <div class="brand-mark">
+          <div class="brand-logo-box" aria-hidden="true">
+            <span class="brand-dot"></span>
+          </div>
+          <div>
+            <div class="brand-eyebrow">HIGGSFIELD API</div>
+            <h1 class="brand-title">Studio Engine</h1>
+          </div>
+        </div>
+        <div class="brand-header-right">
+          <div class="lang-switch" id="langSwitchSidebar" role="group" aria-label="Idioma / Language">
+            <button type="button" class="lang-btn active" data-lang="pt-br">PT-BR</button>
+            <button type="button" class="lang-btn" data-lang="en">EN</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compact API Key Connection Bar -->
+      <section class="key-card" aria-label="Conexão da Chave API">
+        <div class="key-card-main">
+          <div class="key-status-row">
+            <span class="status-indicator" id="keyStatusDot"></span>
+            <span class="key-status-label" id="keyStatusText">Verificando chave...</span>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="openKeyModalBtn">
+            Conectar chave API
+          </button>
+        </div>
+        <p class="key-subtext" id="keySubtext">
+          Lê <code>HF_API_KEY</code> do <code>.env.local</code> ou da sessão.
+        </p>
+      </section>
+
+      <!-- Search Input -->
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <input
+          type="search"
+          id="modelSearchInput"
+          placeholder="Buscar Seedance, Wan 3.0, Genjutsu, Soul..."
+          aria-label="Filtrar modelos ou endpoints"
+        />
+      </div>
+
+      <!-- Category Filter Pills -->
+      <div class="category-tabs" role="tablist" aria-label="Categorias de Modelos">
+        <button type="button" class="cat-tab active" data-category="all" role="tab" aria-selected="true" id="catTabAll">Todos</button>
+        <button type="button" class="cat-tab" data-category="video" role="tab" id="catTabVideo">Vídeo</button>
+        <button type="button" class="cat-tab" data-category="edit" role="tab" id="catTabEdit">Genjutsu &amp; Edição</button>
+        <button type="button" class="cat-tab" data-category="image" role="tab" id="catTabImage">Soul &amp; Imagem</button>
+        <button type="button" class="cat-tab" data-category="character" role="tab" id="catTabCharacter">Personagem</button>
+        <button type="button" class="cat-tab" data-category="audio" role="tab" id="catTabAudio">Áudio</button>
+      </div>
+
+      <!-- Model Picker List -->
+      <div class="model-list" id="modelList" role="listbox" aria-label="Modelos Disponíveis"></div>
+
+      <!-- Account Catalog Discovery Footer -->
+      <div class="sidebar-footer">
+        <button type="button" class="btn btn-ghost btn-sm btn-full" id="syncAccountModelsBtn">
+          <span id="exploreAccountCatalogLabel">Explorar Catálogo da Conta</span>
+          <code>GET /models</code>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Studio Workspace -->
+    <main class="workspace">
+      <!-- Top Model Header -->
+      <header class="workspace-header">
+        <div class="active-model-meta">
+          <div class="model-provider-row">
+            <span class="provider-badge" id="activeModelProvider">ByteDance</span>
+            <code class="endpoint-chip" id="activeModelEndpoint">bytedance/seedance-2.5/text-to-video</code>
+            <span class="schema-badge" id="activeModelBadge">Esquema Verificado</span>
+            <span class="verification-inline" id="verificationBar">
+              <span class="verification-dot" id="verificationDot"></span>
+              <span id="verificationNoteText">Contrato documentado verificado.</span>
+            </span>
+          </div>
+          <div class="title-and-actions-row">
+            <div>
+              <h2 class="active-model-title" id="activeModelName">Seedance 2.5 · Texto para Vídeo</h2>
+              <p class="active-model-desc" id="activeModelDesc">
+                Gera vídeos cinematográficos de até 30s a partir de texto com áudio nativo sincronizado.
+              </p>
+            </div>
+            <div class="header-links">
+              <div class="pricing-stat-box">
+                <span class="pricing-stat-label" id="rateTierLabel">FAIXA DE PREÇO</span>
+                <span class="pricing-pill" id="activeModelPricing">$0.144 - $0.796 / seg</span>
+              </div>
+              <a
+                href="https://open.higgsfield.ai/models/bytedance/seedance-2.5/text-to-video/api-reference"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-ghost btn-sm"
+                id="activeModelDocLink"
+              >
+                Docs da API ↗
+              </a>
+              <div class="lang-switch" id="langSwitchHeader" role="group" aria-label="Idioma / Language">
+                <button type="button" class="lang-btn active" data-lang="pt-br">PT-BR</button>
+                <button type="button" class="lang-btn" data-lang="en">EN</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Split Studio Grid: Left Parameters Director Deck, Right Cinema Viewfinder & Queue -->
+      <div class="studio-grid">
+        <!-- Left Column: Director Controls & Telemetry -->
+        <section class="panel form-panel" aria-label="Parâmetros de Geração">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="panel-Step-dot"></span>
+              <h3 class="panel-title" id="directorControlsTitle">Controles de Direção</h3>
+            </div>
+            <div class="panel-header-actions">
+              <button type="button" class="btn btn-ghost btn-xs" id="loadSoulStylesBtn" hidden>
+                Estilos Soul V2 (33)
+              </button>
+              <button type="button" class="btn btn-ghost btn-xs" id="toggleJsonInspectorBtn">
+                <span id="requestCodeBtnLabel">Código da Requisição</span>
+                <code>{ }</code>
+              </button>
+            </div>
+          </div>
+
+          <form id="generationForm" novalidate>
+            <!-- Dynamic Model Fields Container -->
+            <div id="dynamicFieldsContainer" class="fields-stack"></div>
+
+            <!-- Soul V2 Styles Drawer -->
+            <div id="soulStylesDrawer" class="soul-styles-drawer" hidden>
+              <div class="drawer-header">
+                <span id="soulStylesDrawerTitle">Selecione um Estilo Curado do Soul V2</span>
+                <button type="button" class="btn-close-xs" id="closeSoulStylesBtn" aria-label="Fechar estilos">×</button>
+              </div>
+              <div id="soulStylesList" class="soul-styles-grid"></div>
+            </div>
+
+            <!-- Code & JSON Payload Inspector -->
+            <div id="jsonInspectorBox" class="json-inspector" hidden>
+              <div class="inspector-tabs-row">
+                <div class="inspector-tabs">
+                  <button type="button" class="code-tab active" data-codetab="json" id="codeTabJson">Payload JSON</button>
+                  <button type="button" class="code-tab" data-codetab="curl">cURL</button>
+                  <button type="button" class="code-tab" data-codetab="ts">SDK TypeScript</button>
+                </div>
+                <div class="inspector-actions">
+                  <label class="checkbox-inline" id="customJsonToggleLabel">
+                    <input type="checkbox" id="useCustomJsonToggle" />
+                    <span id="customOverrideLabel">Editar JSON Manualmente</span>
+                  </label>
+                  <button type="button" class="btn btn-ghost btn-xs" id="copyCodeSnippetBtn">Copiar</button>
+                </div>
+              </div>
+              <div class="endpoint-preview-line">
+                POST <code>https://api.higgsfield.ai<span id="jsonEndpointPreview">/bytedance/seedance-2.5/text-to-video</span></code>
+              </div>
+              <textarea
+                id="rawJsonTextarea"
+                rows="7"
+                spellcheck="false"
+                class="mono-textarea"
+              ></textarea>
+            </div>
+
+            <!-- Form Error Alert -->
+            <div id="formErrorBox" class="alert-error" hidden></div>
+
+            <!-- Integrated Live Telemetry & Billing Dock -->
+            <div class="billing-dock" id="liveCostCard" aria-live="polite">
+              <div class="billing-dock-main">
+                <div class="billing-figures">
+                  <span class="billing-eyebrow" id="estimatedCostEyebrow">CUSTO ESTIMADO</span>
+                  <div class="billing-numbers">
+                    <span class="cost-metric-value" id="liveCostUsd">$1.59</span>
+                    <span class="cost-credits-pill" id="liveCostCredits">~32.5 créditos</span>
+                  </div>
+                </div>
+                <div class="billing-meta-right">
+                  <div class="billing-source-row">
+                    <span class="live-cost-source-badge" id="liveCostSourceBadge">Cálculo Instantâneo</span>
+                    <button
+                      type="button"
+                      class="btn-icon-refresh"
+                      id="refreshEstimateBtn"
+                      title="Sincronizar cotação exata da conta via POST /estimate"
+                      aria-label="Sincronizar cotação exata da conta"
+                    >
+                      ↻
+                    </button>
+                  </div>
+                  <div class="cost-metric-breakdown" id="liveCostBreakdown">
+                    5s · 720p · 16:9 · áudio ligado
+                  </div>
+                </div>
+              </div>
+              <div class="billing-dock-rule" id="liveCostFootnote">
+                Apenas execuções <code>completed</code> consomem créditos · <code>failed</code>, <code>nsfw</code> e <code>canceled</code> na fila são estornados · retenção de 7+ dias na CDN
+              </div>
+            </div>
+
+            <!-- Primary Submit CTA -->
+            <div class="submit-bar">
+              <button type="submit" class="btn btn-primary btn-generate" id="submitGenerateBtn" title="Atalho: Cmd/Ctrl + Enter">
+                <span id="submitBtnText">Gerar Mídia</span>
+                <kbd class="kbd-hint">⌘↵</kbd>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Right Column: Cinema Viewfinder Stage & Request Queue -->
+        <section class="panel output-panel" aria-label="Monitor de Saída e Fila de Requisições">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="panel-step-dot monitor-dot"></span>
+              <h3 class="panel-title" id="studioMonitorTitle">Monitor do Estúdio</h3>
+            </div>
+            <div class="monitor-header-badges">
+              <span class="monitor-spec-pill" id="monitorSpecPill">16:9 · 720P</span>
+              <span class="queue-counter" id="activePollsBadge">Ocioso</span>
+            </div>
+          </div>
+
+          <!-- Active Media Viewfinder Stage -->
+          <div id="outputStage" class="output-stage"></div>
+
+          <!-- Job Queue & History List -->
+          <div class="history-section">
+            <div class="panel-header history-header">
+              <h3 class="panel-title" id="renderQueueTitle">Fila de Renderização &amp; Histórico</h3>
+              <span class="history-hint" id="historyRetentionHint">Arquivos retidos por 7+ dias na CDN</span>
+            </div>
+            <div id="jobsList" class="jobs-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Connect / Manage API Key Modal -->
+  <div class="modal-backdrop" id="keyModalBackdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="keyModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="keyModalTitle">Conectar chave API</h2>
+        <button type="button" class="btn-close" id="closeKeyModalBtn" aria-label="Fechar modal">×</button>
+      </div>
+      <p class="modal-instruction" id="keyModalInstruction">
+        Cole a chave de API copiada de <a href="https://open.higgsfield.ai/api-keys" target="_blank" rel="noopener noreferrer">open.higgsfield.ai</a> exatamente como está.
+      </p>
+      <form id="apiKeyForm">
+        <div class="field-group">
+          <label for="apiKeyPasswordInput" id="apiKeyFieldLabel">Chave de API da Higgsfield</label>
+          <input
+            type="password"
+            id="apiKeyPasswordInput"
+            placeholder="key-id:key-secret"
+            autocomplete="off"
+            required
+          />
+          <span class="field-hint" id="apiKeyFieldHint">
+            Mantida estritamente no servidor. Enviada como <code>Authorization: Key &lt;api-key&gt;</code>.
+          </span>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="persistEnvLocalCheckbox" checked />
+          <span id="persistEnvLocalLabel">Salvar no arquivo local <code>.env.local</code> (ignorado pelo Git)</span>
+        </label>
+        <div id="keyModalError" class="alert-error" hidden></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="removeKeyBtn" hidden>
+            Remover chave API
+          </button>
+          <div class="modal-actions-right">
+            <button type="button" class="btn btn-ghost" id="cancelKeyModalBtn">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="saveKeyBtn">Salvar chave API</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Account Models Explorer Modal -->
+  <div class="modal-backdrop" id="accountModelsModalBackdrop" hidden>
+    <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="accountModelsTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="accountModelsTitle">Catálogo de Modelos da Conta (GET /models)</h2>
+        <button type="button" class="btn-close" id="closeAccountModelsBtn" aria-label="Fechar modal">×</button>
+      </div>
+      <p class="modal-instruction" id="accountModelsInstruction">
+        Clique em qualquer endpoint habilitado na sua conta Higgsfield para carregá-lo diretamente no estúdio.
+      </p>
+      <div id="accountModelsContent" class="account-models-list"></div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
