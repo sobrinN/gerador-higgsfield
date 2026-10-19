@@ -923,6 +923,46 @@ textarea:focus {
   border: 1px solid var(--border-strong);
 }
 
+.ref-video-duration-bar {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ref-video-duration-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ref-video-duration-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ref-video-duration-status {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-muted);
+}
+
+.ref-video-duration-status.detected {
+  background-color: rgba(43, 182, 115, 0.14);
+  border-color: rgba(43, 182, 115, 0.45);
+  color: #5ee2a0;
+  font-weight: 600;
+}
+
 .multi-urls-list {
   display: flex;
   flex-direction: column;
@@ -1469,6 +1509,14 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.stage-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .queue-counter {

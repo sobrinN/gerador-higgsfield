@@ -23,9 +23,9 @@ Designed to run **100% locally on your machine** (`http://localhost:3000`) with 
 - **Seedance 2.5 (ByteDance):**
   - `bytedance/seedance-2.5/text-to-video` (Text to Video with native audio)
   - `bytedance/seedance-2.5/image-to-video` (Image to Video + optional end frame)
-  - `bytedance/seedance-2.5/reference-to-video` (Multimodal Reference to Video)
-  - `bytedance/seedance-2.5/video-edit` (Natural-language Video Edit)
-  - `bytedance/seedance-2.5/video-extend` (Video Continuation / Extend)
+  - `bytedance/seedance-2.5/reference-to-video` (Multimodal Reference to Video: `image_urls`, `audio_urls`, `video_urls`)
+  - `bytedance/seedance-2.5/video-edit` (Natural-language Video Edit + optional image/audio/video references)
+  - `bytedance/seedance-2.5/video-extend` (Video Continuation / Extend + optional image/audio/video references)
 - **Higgsfield Genjutsu (Video Editing & Motion):**
   - `higgsfield/genjutsu/motion-transfer/v1.0` (Motion Transfer with 1-8 reference images)
   - `higgsfield/genjutsu/object-swap/v1.0` (Object & Product Swap in footage)
@@ -35,9 +35,9 @@ Designed to run **100% locally on your machine** (`http://localhost:3000`) with 
   - `higgsfield-ai/soul/v2/image-to-image` (SOUL V2 Image-to-Image)
   - `higgsfield-ai/soul/cinema` (SOUL Cinema Widescreen Stills)
   - `higgsfield/ai-influencer` (AI Influencer Character Sheet Creator)
-  - `higgsfield-ai/soul-id` (Soul ID Custom Character Reference)
+  - `soul-id` (Soul ID Custom Character Reference)
 - **Additional Video, Image & Audio Models:**
-  - `higgsfield/cinema-studio/v4.0`, `kling-video/v3.0/pro/text-to-video`, `lightricks/ltx-2.5/text-to-video/pro`, `marketing-studio/image`, `recraft/v4.1/pro/text-to-image`, `xai/grok-imagine-image-2.0`, `v1/speak/higgsfield` (Speak v2 Audio-to-Video), plus a **Custom Endpoint** mode for any model path.
+  - `higgsfield/cinema-studio/4.0`, `kling-video/v3.0/pro/text-to-video`, `lightricks/ltx-2.5/text-to-video/pro`, `marketing-studio/image`, `recraft/v4.1/pro/text-to-image`, `xai/grok-imagine-image-2.0`, `v1/speak/higgsfield` (Speak v2 Audio-to-Video), plus a **Custom Endpoint** mode for any model path.
 
 ### 1. Configure Your Higgsfield API Key
 
@@ -85,9 +85,9 @@ Projetado para rodar **100% localmente no seu computador** (`http://localhost:30
 - **Seedance 2.5 (ByteDance):**
   - `bytedance/seedance-2.5/text-to-video` (Texto para Vídeo com áudio nativo)
   - `bytedance/seedance-2.5/image-to-video` (Imagem para Vídeo + frame final opcional)
-  - `bytedance/seedance-2.5/reference-to-video` (Referência Multimodal para Vídeo)
-  - `bytedance/seedance-2.5/video-edit` (Edição de Vídeo por linguagem natural)
-  - `bytedance/seedance-2.5/video-extend` (Continuação / Extensão de Vídeo)
+  - `bytedance/seedance-2.5/reference-to-video` (Referência Multimodal para Vídeo: `image_urls`, `audio_urls`, `video_urls`)
+  - `bytedance/seedance-2.5/video-edit` (Edição de Vídeo por linguagem natural + referências opcionais de imagem/áudio/vídeo)
+  - `bytedance/seedance-2.5/video-extend` (Continuação / Extensão de Vídeo + referências opcionais de imagem/áudio/vídeo)
 - **Higgsfield Genjutsu (Edição de Vídeo & Movimento):**
   - `higgsfield/genjutsu/motion-transfer/v1.0` (Transferência de Movimento com 1 a 8 imagens de referência)
   - `higgsfield/genjutsu/object-swap/v1.0` (Troca de Objeto e Produto em vídeo)
@@ -97,9 +97,9 @@ Projetado para rodar **100% localmente no seu computador** (`http://localhost:30
   - `higgsfield-ai/soul/v2/image-to-image` (SOUL V2 Imagem-para-Imagem)
   - `higgsfield-ai/soul/cinema` (SOUL Cinema Widescreen Stills)
   - `higgsfield/ai-influencer` (Criador de Character Sheet para AI Influencer)
-  - `higgsfield-ai/soul-id` (Treinamento/Referência de Personagem Soul ID)
+  - `soul-id` (Treinamento/Referência de Personagem Soul ID)
 - **Modelos Adicionais de Vídeo, Imagem & Áudio:**
-  - `higgsfield/cinema-studio/v4.0`, `kling-video/v3.0/pro/text-to-video`, `lightricks/ltx-2.5/text-to-video/pro`, `marketing-studio/image`, `recraft/v4.1/pro/text-to-image`, `xai/grok-imagine-image-2.0`, `v1/speak/higgsfield` (Speak v2 Áudio-para-Vídeo), além do modo **Endpoint Personalizado** para qualquer modelo da plataforma.
+  - `higgsfield/cinema-studio/4.0`, `kling-video/v3.0/pro/text-to-video`, `lightricks/ltx-2.5/text-to-video/pro`, `marketing-studio/image`, `recraft/v4.1/pro/text-to-image`, `xai/grok-imagine-image-2.0`, `v1/speak/higgsfield` (Speak v2 Áudio-para-Vídeo), além do modo **Endpoint Personalizado** para qualquer modelo da plataforma.
 
 ### 1. Configure Sua Chave de API da Higgsfield
 

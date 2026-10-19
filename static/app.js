@@ -11,6 +11,9 @@
     searchQuery: "",
     activeModel: null,
     formValues: {},
+    refVideoDuration: 5,
+    refVideoRawDuration: null,
+    accountDiscountPct: 15,
     activeCodeTab: "json",
     jobs: [],
     activeStageJobId: null,
@@ -63,7 +66,8 @@
       instantTierCalc: "Cálculo Instantâneo",
       syncingEstimate: "Sincronizando /estimate...",
       verifiedAccountQuote: "Cotação Verificada da Conta",
-      accountQuoteDiscount: (pct) => `Cotação da Conta (${pct} off)`,
+      verifiedRateTable: "Tabela Verificada /estimate",
+      accountQuoteDiscount: (pct) => `Cotação da Conta (${pct}% off)`,
       creditsUnit: "créditos",
       billingFootnote:
         "Apenas execuções <code>completed</code> consomem créditos · <code>failed</code>, <code>nsfw</code> e <code>canceled</code> na fila são estornados · retenção de 7+ dias na CDN",
@@ -90,6 +94,10 @@
         `Arraste e solte mídia local (${fmt}) ou cole uma URL pública`,
       dropMultiImages:
         "Arraste e solte múltiplas imagens de referência (PNG · JPG · WEBP) ou adicione URLs",
+      dropMultiAudios:
+        "Arraste e solte arquivos de áudio de referência (WAV · MP3 · M4A) ou adicione URLs",
+      dropMultiVideos:
+        "Arraste e solte vídeos de referência (MP4 · MOV · WEBM) ou adicione URLs",
       browseFile: "Escolher Arquivo",
       browseFiles: "Escolher Arquivos",
       addUrl: "Adicionar URL",
@@ -101,6 +109,7 @@
         "Configure os parâmetros à esquerda e pressione Gerar Mídia.",
       estPrefix: "EST:",
       animateSeedance: "Animar no Seedance 2.5 I2V →",
+      animateSeedanceR2v: "Seedance 2.5 Ref (+ Áudio) →",
       animateWan: "Animar no Wan 3.0 Prime I2V →",
       useGenjutsu: "Usar no Genjutsu Motion →",
       elapsedSuffix: "s decorridos",
@@ -108,6 +117,9 @@
       pollingSub: (id) =>
         `Consultando <code>/requests/${id}/status</code> automaticamente...`,
       cancelQueuedBtn: "Cancelar Requisição na Fila",
+      refreshStatusBtn: "Atualizar Status ↻",
+      refreshingStatus: "Consultando...",
+      statusRefreshedToast: (st) => `Status na Higgsfield: ${st}`,
       terminalStatePrefix: "Estado Final:",
       terminalErrorFallback:
         "A requisição terminou sem gerar mídia. Requisições com falha, NSFW ou canceladas não são cobradas.",
@@ -139,6 +151,8 @@
         "Janela de cancelamento encerrada (a geração já está em andamento).",
       missingRequiredError: (label, name) =>
         `O campo obrigatório '${label}' (${name}) está vazio.`,
+      missingR2vRefError:
+        "Informe pelo menos uma mídia de referência em URLs de Imagens (image_urls), Áudio (audio_urls) ou Vídeo (video_urls).",
       invalidJsonError: (msg) => `JSON personalizado inválido: ${msg}`,
       statusLabels: {
         queued: "NA FILA",
@@ -155,6 +169,12 @@
       breakdownSoundOff: "sem som",
       breakdownCharLock: "trava de personagem",
       breakdownSheet: "folha 2K · 16:9",
+      refVideoDurationLabel: "Duração do Vídeo Fonte (p/ cálculo de custo)",
+      refVideoDetectedBadge: (rawSec, billedSec) =>
+        `Detectado do vídeo: ${rawSec.toFixed(1)}s → ${billedSec}s cobrados`,
+      refVideoManualBadge: (sec) =>
+        `${sec}s (prévia · envie um vídeo local para detectar automaticamente)`,
+      beforeDiscountList: (usdStr) => `${usdStr} s/ desc.`,
     },
     en: {
       pageTitle: "Higgsfield Studio · Local Rust Media Engine",
@@ -194,7 +214,8 @@
       instantTierCalc: "Instant Tier Calc",
       syncingEstimate: "Syncing /estimate...",
       verifiedAccountQuote: "Verified Account Quote",
-      accountQuoteDiscount: (pct) => `Account Quote (${pct} off)`,
+      verifiedRateTable: "Verified /estimate Rate",
+      accountQuoteDiscount: (pct) => `Account Quote (${pct}% off)`,
       creditsUnit: "credits",
       billingFootnote:
         "Only <code>completed</code> runs spend credits · <code>failed</code>, <code>nsfw</code> &amp; queued <code>canceled</code> runs auto-refund · 7-day CDN retention",
@@ -221,6 +242,10 @@
         `Drag & drop local media (${fmt}) or paste public URL`,
       dropMultiImages:
         "Drag & drop multiple reference images (PNG · JPG · WEBP) or add URLs",
+      dropMultiAudios:
+        "Drag & drop reference audio files (WAV · MP3 · M4A) or add URLs",
+      dropMultiVideos:
+        "Drag & drop reference videos (MP4 · MOV · WEBM) or add URLs",
       browseFile: "Browse File",
       browseFiles: "Browse Files",
       addUrl: "Add URL",
@@ -232,6 +257,7 @@
         "Configure parameters on the left and press Generate Media.",
       estPrefix: "EST:",
       animateSeedance: "Animate in Seedance 2.5 I2V →",
+      animateSeedanceR2v: "Seedance 2.5 Ref (+ Audio) →",
       animateWan: "Animate in Wan 3.0 Prime I2V →",
       useGenjutsu: "Use in Genjutsu Motion →",
       elapsedSuffix: "s elapsed",
@@ -239,6 +265,9 @@
       pollingSub: (id) =>
         `Polling <code>/requests/${id}/status</code> with 2s-to-10s backoff...`,
       cancelQueuedBtn: "Cancel Queued Request",
+      refreshStatusBtn: "Refresh Status ↻",
+      refreshingStatus: "Checking...",
+      statusRefreshedToast: (st) => `Higgsfield status: ${st}`,
       terminalStatePrefix: "Terminal State:",
       terminalErrorFallback:
         "Request ended without generating media. Failed, NSFW, and canceled requests are not charged.",
@@ -270,6 +299,8 @@
         "Cancellation window closed (request is already in progress).",
       missingRequiredError: (label, name) =>
         `Required field '${label}' (${name}) is missing or empty.`,
+      missingR2vRefError:
+        "Provide at least one reference item in Reference Image URLs (image_urls), Audio URLs (audio_urls), or Video URLs (video_urls).",
       invalidJsonError: (msg) => `Invalid custom JSON body: ${msg}`,
       statusLabels: {
         queued: "QUEUED",
@@ -286,6 +317,12 @@
       breakdownSoundOff: "sound off",
       breakdownCharLock: "character lock",
       breakdownSheet: "2K · 16:9 sheet",
+      refVideoDurationLabel: "Source Video Duration (for cost estimate)",
+      refVideoDetectedBadge: (rawSec, billedSec) =>
+        `Detected from video: ${rawSec.toFixed(1)}s → ${billedSec}s billed`,
+      refVideoManualBadge: (sec) =>
+        `${sec}s (preview · upload a local video to auto-detect)`,
+      beforeDiscountList: (usdStr) => `${usdStr} list`,
     },
   };
 
@@ -297,43 +334,43 @@
       description:
         "Gera vídeos cinematográficos com física realista de até 30s a partir de texto com áudio nativo sincronizado.",
       verification_note:
-        "Contrato documentado verificado via referência oficial da API Seedance 2.5.",
+        "Contrato documentado verificado via referência oficial da API Seedance 2.5 Texto para Vídeo.",
     },
     "seedance-2.5-i2v": {
       name: "Seedance 2.5 · Imagem para Vídeo",
       badge: "Esquema Verificado",
       pricing_hint: "$0.144 - $0.796 / seg",
       description:
-        "Anima uma imagem inicial (com quadro final e prompt opcionais) em um vídeo de 4 a 30s com áudio nativo.",
+        "Anima uma imagem inicial (com quadro final e prompt opcionais) em um vídeo de 4 a 30s com áudio nativo. (Para usar áudio de referência + imagem, use Seedance 2.5 · Referência para Vídeo).",
       verification_note:
-        "Contrato documentado verificado via visão geral do Seedance 2.5 Imagem para Vídeo.",
+        "Contrato documentado verificado via referência oficial da API Seedance 2.5 Imagem para Vídeo (additionalProperties: false).",
     },
     "seedance-2.5-r2v": {
       name: "Seedance 2.5 · Referência para Vídeo",
-      badge: "Ref Multimodal",
+      badge: "Esquema Verificado",
       pricing_hint: "$0.173 - $0.955 / seg",
       description:
-        "Gera vídeos consistentes de personagem, cenário e estilo guiados por imagens, vídeo ou áudio de referência.",
+        "Gera vídeos consistentes de personagem, cenário e estilo guiados por imagens, vídeos e/ou áudio de referência (até 30 imagens, 10 vídeos, 10 áudios).",
       verification_note:
-        "Endpoint e parâmetros principais verificados via playground do Seedance 2.5 Reference-to-Video.",
+        "Contrato documentado verificado via referência oficial da API Seedance 2.5 Reference-to-Video (suporta image_urls, audio_urls e video_urls).",
     },
     "seedance-2.5-edit": {
       name: "Seedance 2.5 · Edição de Vídeo",
-      badge: "Edição de Vídeo",
+      badge: "Esquema Verificado",
       pricing_hint: "$0.173 - $0.955 / seg",
       description:
-        "Edita um vídeo de entrada usando instruções em linguagem natural e imagens de referência opcionais mantendo o movimento.",
+        "Edita um vídeo fonte usando instruções em linguagem natural e imagens, áudios ou vídeos de referência opcionais mantendo o movimento (duração segue o vídeo fonte).",
       verification_note:
-        "Confirmado no catálogo de open.higgsfield.ai ($0.1728-$0.9553/s, 480p-1080p, 4-30s); preço ao vivo via /estimate.",
+        "Contrato documentado verificado via referência oficial da API Seedance 2.5 Video Edit (duração derivada do video_url fonte).",
     },
     "seedance-2.5-extend": {
       name: "Seedance 2.5 · Estender Vídeo",
-      badge: "Extensão de Vídeo",
+      badge: "Esquema Verificado",
       pricing_hint: "$0.173 - $0.955 / seg",
       description:
-        "Continua e estende um clipe de vídeo existente por até 30 segundos com movimento e áudio coerentes.",
+        "Continua e estende um clipe de vídeo existente por 4 a 30 segundos com movimento coerente, mídias de referência opcionais e áudio.",
       verification_note:
-        "Confirmado no catálogo de open.higgsfield.ai; preço ao vivo via /estimate.",
+        "Contrato documentado verificado via referência oficial da API Seedance 2.5 Video Extend.",
     },
     "wan-3.0-t2v": {
       name: "Wan 3.0 · Texto para Vídeo",
@@ -473,19 +510,20 @@
     "kling-3.0-pro-t2v": {
       name: "Kling 3.0 Pro · Texto para Vídeo",
       badge: "Esquema Verificado",
-      pricing_hint: "$0.056 - $0.084 / seg",
+      pricing_hint: "$0.095 - $0.168 / seg",
       description:
         "Gera vídeos cinematográficos multi-corte a partir de texto com áudio nativo e duração de 3 a 15 segundos.",
       verification_note:
-        "Verificado via Playground do Kling 3.0 ($0.056-$0.084/s, 3-15s, sound, cfg_scale, multi_shots).",
+        "Verificado via API /estimate do Kling 3.0 Pro ($0.095-$0.168/s, 3-15s, sound, cfg_scale, multi_shots).",
     },
     "ltx-2.5-pro-t2v": {
       name: "LTX-2.5 Pro · Texto para Vídeo",
-      badge: "Endpoint Verificado",
-      pricing_hint: "Rápido & Pro",
-      description: "Geração de vídeo cinematográfico de alta velocidade via LTX-2.5 Pro.",
+      badge: "Esquema Verificado",
+      pricing_hint: "$0.120 - $0.170 / seg",
+      description:
+        "Geração de vídeo cinematográfico de alta velocidade via LTX-2.5 Pro (6, 8 ou 10 segundos em 720p ou 1080p).",
       verification_note:
-        "Endpoint POST /lightricks/ltx-2.5/text-to-video/pro verificado via docs.higgsfield.ai.",
+        "Endpoint POST /lightricks/ltx-2.5/text-to-video/pro verificado via API (durações aceitas: 6, 8 ou 10s).",
     },
     "marketing-studio-image": {
       name: "Marketing Studio Image · Campanhas 4K",
@@ -499,20 +537,20 @@
     "recraft-v4.1-pro": {
       name: "Recraft V4.1 Pro · Imagem de Estúdio 2K",
       badge: "Esquema Verificado",
-      pricing_hint: "$0.105 - $0.210 / img",
+      pricing_hint: "$0.210 / img",
       description:
-        "Fotografia comercial de alta definição (1K–2K) e design tipográfico preciso.",
+        "Fotografia comercial de alta definição (2K) e design tipográfico preciso.",
       verification_note:
-        "Endpoint recraft/v4.1/pro/text-to-image verificado via medições na API.",
+        "Endpoint recraft/v4.1/pro/text-to-image verificado via medições na API (resolução suportada: 2k).",
     },
     "grok-imagine-2.0": {
       name: "Grok Imagine 2.0 · Imagem & Edição por Ref",
       badge: "Esquema Verificado",
-      pricing_hint: "$0.070 / img",
+      pricing_hint: "$0.040 - $0.080 / img",
       description:
         "Gera ou edita imagens com até 10 imagens de referência preservando identidade e enquadramento.",
       verification_note:
-        "Endpoint xai/grok-imagine-image-2.0 verificado com edição guiada por referências.",
+        "Endpoint xai/grok-imagine-image-2.0 verificado com edição guiada por referências (quality: low ou medium).",
     },
     "speak-v2-audio-video": {
       name: "Higgsfield Speak v2 · Áudio / Voz para Vídeo",
@@ -607,6 +645,16 @@
     image_urls: {
       label: "URLs das Imagens de Referência",
       description: "URLs públicas de imagens de personagem, figurino, produto ou cenário.",
+    },
+    audio_urls: {
+      label: "URLs de Áudio de Referência (Opcional, até 10 áudios)",
+      description:
+        "URLs públicas de arquivos de áudio (WAV/MP3/M4A, até 10 arquivos / 30s totais) para guiar voz, fala, música ou ritmo.",
+    },
+    video_urls: {
+      label: "URLs de Vídeo de Referência (Opcional, até 10 vídeos)",
+      description:
+        "URLs públicas de vídeos de referência (MP4/MOV, até 10 vídeos / 30s totais) para condicionamento de movimento ou câmera.",
     },
     item_image_urls: {
       label: "URLs de Roupas / Itens (Apenas Humanos, até 3)",
@@ -1037,656 +1085,7 @@
     }
   }
 
-  const VERIFIED_MODEL_PATCHES = {
-    "seedance-2.5-i2v": {
-      addFields: [
-        {
-          name: "output_format",
-          label: "Output Format",
-          field_type: "select",
-          required: false,
-          default_value: "mp4",
-          description: "Container format for the generated video.",
-          options: [
-            { label: "MP4", value: "mp4" },
-            { label: "MOV", value: "mov" },
-          ],
-          after: "bitrate_mode",
-        },
-      ],
-    },
-    "seedance-2.5-r2v": {
-      addFields: [
-        {
-          name: "output_format",
-          label: "Output Format",
-          field_type: "select",
-          required: false,
-          default_value: "mp4",
-          description: "Container format for the generated video.",
-          options: [
-            { label: "MP4", value: "mp4" },
-            { label: "MOV", value: "mov" },
-          ],
-          after: "bitrate_mode",
-        },
-      ],
-    },
-    "seedance-2.5-edit": {
-      addFields: [
-        {
-          name: "duration",
-          label: "Duration (seconds)",
-          field_type: "number",
-          required: false,
-          default_value: 5,
-          description: "Output clip duration (4 to 30 seconds).",
-          min: 4,
-          max: 30,
-          step: 1,
-          after: "image_urls",
-        },
-        {
-          name: "bitrate_mode",
-          label: "Bitrate Mode",
-          field_type: "select",
-          required: false,
-          default_value: "high",
-          description: "Bitrate mode.",
-          options: [
-            { label: "High", value: "high" },
-            { label: "Standard", value: "standard" },
-          ],
-          after: "resolution",
-        },
-        {
-          name: "output_format",
-          label: "Output Format",
-          field_type: "select",
-          required: false,
-          default_value: "mp4",
-          description: "Container format for the edited video.",
-          options: [
-            { label: "MP4", value: "mp4" },
-            { label: "MOV", value: "mov" },
-          ],
-          after: "bitrate_mode",
-        },
-      ],
-    },
-    "seedance-2.5-extend": {
-      addFields: [
-        {
-          name: "bitrate_mode",
-          label: "Bitrate Mode",
-          field_type: "select",
-          required: false,
-          default_value: "high",
-          description: "Bitrate mode.",
-          options: [
-            { label: "High", value: "high" },
-            { label: "Standard", value: "standard" },
-          ],
-          after: "resolution",
-        },
-        {
-          name: "output_format",
-          label: "Output Format",
-          field_type: "select",
-          required: false,
-          default_value: "mp4",
-          description: "Container format for the extended video.",
-          options: [
-            { label: "MP4", value: "mp4" },
-            { label: "MOV", value: "mov" },
-          ],
-          after: "bitrate_mode",
-        },
-      ],
-    },
-    "wan-3.0-i2v": {
-      doc_url: "https://open.higgsfield.ai/models/alibaba/wan-3.0/image-to-video/playground",
-      addFields: [
-        {
-          name: "aspect_ratio",
-          label: "Aspect Ratio",
-          field_type: "select",
-          required: false,
-          default_value: "adaptive",
-          description: "Output aspect ratio (defaults to adaptive to match source image).",
-          options: [
-            { label: "Adaptive", value: "adaptive" },
-            { label: "16:9", value: "16:9" },
-            { label: "9:16", value: "9:16" },
-            { label: "1:1", value: "1:1" },
-            { label: "4:3", value: "4:3" },
-            { label: "3:4", value: "3:4" },
-            { label: "21:9", value: "21:9" },
-          ],
-          after: "resolution",
-        },
-      ],
-    },
-    "wan-3.0-r2v": {
-      addFields: [
-        {
-          name: "enable_thinking",
-          label: "Enable Thinking Mode",
-          field_type: "boolean",
-          required: false,
-          default_value: false,
-          description: "Enable prompt reasoning pass before rendering.",
-          after: "generate_audio",
-        },
-      ],
-    },
-    "wan-3.0-prime-i2v": {
-      addFields: [
-        {
-          name: "aspect_ratio",
-          label: "Aspect Ratio",
-          field_type: "select",
-          required: false,
-          default_value: "adaptive",
-          description: "Output aspect ratio (defaults to adaptive to match source image).",
-          options: [
-            { label: "Adaptive", value: "adaptive" },
-            { label: "16:9", value: "16:9" },
-            { label: "9:16", value: "9:16" },
-            { label: "1:1", value: "1:1" },
-            { label: "4:3", value: "4:3" },
-            { label: "3:4", value: "3:4" },
-            { label: "21:9", value: "21:9" },
-          ],
-          after: "resolution",
-        },
-      ],
-    },
-    "wan-3.0-prime-r2v": {
-      addFields: [
-        {
-          name: "enable_thinking",
-          label: "Enable Thinking Mode",
-          field_type: "boolean",
-          required: false,
-          default_value: false,
-          description: "Enable prompt reasoning pass before rendering.",
-          after: "generate_audio",
-        },
-      ],
-    },
-    "genjutsu-object-swap": {
-      verified_schema: true,
-      badge: "Verified Schema",
-      patchField: { prompt: { required: false, label: "Swap Instructions (Optional)" } },
-    },
-    "genjutsu-restyle": {
-      verified_schema: true,
-      badge: "Verified Schema",
-      pricing_hint: "$0.318 - $1.632 / sec",
-      doc_url: "https://open.higgsfield.ai/models/higgsfield/genjutsu/restyle/v1.0/playground",
-      verification_note:
-        "Verified via official Genjutsu Restyle Playground ($0.318/s 480p, $0.681/s 720p, $1.632/s 1080p).",
-      patchField: { prompt: { required: false, label: "Style Prompt (Optional)" } },
-      addFields: [
-        {
-          name: "preset_id",
-          label: "Visual Style Preset ID (preset_id)",
-          field_type: "text",
-          required: false,
-          default_value: "",
-          description:
-            "Visual style preset ID for restyling (optional if prompt or style images are provided).",
-          after: "video_url",
-        },
-      ],
-    },
-    "soul-v2-standard": {
-      addFields: [
-        {
-          name: "seed",
-          label: "Seed (Optional)",
-          field_type: "number",
-          required: false,
-          default_value: null,
-          description: "Optional integer seed for reproducible image generation.",
-          min: 1,
-          step: 1,
-          after: "style_id",
-        },
-      ],
-    },
-    "ai-influencer": {
-      pricing_hint: "$0.05 / 2K sheet",
-      doc_url: "https://open.higgsfield.ai/models/higgsfield/ai-influencer/api-reference",
-      verification_note:
-        "Verified via official AI Influencer API Reference: 9 character types (normal, freak, total, cats, dogs, capybaras, birds, frogs, insects) at $0.05 per 2K 16:9 sheet.",
-      fields: [
-        {
-          name: "tier",
-          label: "Character Type (tier)",
-          field_type: "select",
-          required: false,
-          default_value: "normal",
-          description:
-            "Select one of the 9 API character types: Human (Average / Bold / Extreme) or Animal modes.",
-          options: [
-            { label: "Average · Human (normal)", value: "normal" },
-            { label: "Bold · Human (freak)", value: "freak" },
-            { label: "Extreme · Human (total)", value: "total" },
-            { label: "Cat (cats)", value: "cats" },
-            { label: "Dog (dogs)", value: "dogs" },
-            { label: "Capybara (capybaras)", value: "capybaras" },
-            { label: "Bird (birds)", value: "birds" },
-            { label: "Frog (frogs)", value: "frogs" },
-            { label: "Insect (insects)", value: "insects" },
-          ],
-        },
-        {
-          name: "brief",
-          label: "Character Direction / Brief",
-          field_type: "textarea",
-          required: false,
-          default_value: "",
-          description:
-            "Optional character direction (up to 4,000 characters): facial features, hair, wardrobe, and persona.",
-        },
-        {
-          name: "__sel_gender",
-          label: "Gender (selection.gender)",
-          field_type: "select",
-          required: false,
-          default_value: "",
-          description: "Optional gender trait from the official AI Influencer options catalog.",
-          options: [
-            { label: "Auto / Random", value: "" },
-            { label: "Female", value: "female" },
-            { label: "Male", value: "male" },
-            { label: "Non-Binary", value: "non_binary" },
-            { label: "Trans Man", value: "trans_man" },
-            { label: "Trans Woman", value: "trans_woman" },
-          ],
-        },
-        {
-          name: "__sel_body_type",
-          label: "Body Build (selection.body_type)",
-          field_type: "select",
-          required: false,
-          default_value: "",
-          description: "Optional build trait from the official AI Influencer options catalog.",
-          options: [
-            { label: "Auto / Random", value: "" },
-            { label: "Slim", value: "body_slim" },
-            { label: "Athletic", value: "body_athletic" },
-            { label: "Muscular", value: "body_muscular" },
-            { label: "Curvy", value: "body_curvy" },
-            { label: "Heavy", value: "body_heavy" },
-            { label: "Ultra Muscular", value: "body_ultra" },
-          ],
-        },
-        {
-          name: "__sel_aesthetic",
-          label: "Outfit / Aesthetic Style (selection.aesthetic)",
-          field_type: "select",
-          required: false,
-          default_value: "",
-          description: "Optional outfit aesthetic preset from the official AI Influencer options catalog.",
-          options: [
-            { label: "Auto / Default", value: "" },
-            { label: "Casual", value: "casual" },
-            { label: "Streetstyle", value: "streetstyle" },
-            { label: "Sporty", value: "sporty" },
-            { label: "Suits", value: "suits" },
-            { label: "Retro", value: "retro" },
-            { label: "Y2K", value: "y2k" },
-            { label: "Goth", value: "goth" },
-            { label: "Theatrical", value: "theatrical" },
-          ],
-        },
-        {
-          name: "image_url",
-          label: "Identity Reference Photo URL (Human Types Only)",
-          field_type: "image_url",
-          required: false,
-          default_value: "",
-          description:
-            "Human types only ('Upload your photo' to keep facial likeness). Automatically omitted for animal tiers.",
-        },
-        {
-          name: "item_image_urls",
-          label: "Clothing / Item Reference URLs (Human Types Only, Up to 3)",
-          field_type: "image_urls",
-          required: false,
-          default_value: [],
-          description:
-            "Human types only: up to 3 clothing, footwear, or item reference image URLs. Automatically omitted for animal tiers.",
-        },
-        {
-          name: "seed",
-          label: "Character Seed (Optional)",
-          field_type: "number",
-          required: false,
-          default_value: null,
-          description:
-            "Character-selection seed from 1 to 1,000,000. Leave blank for auto-generated seed.",
-          min: 1,
-          max: 1000000,
-          step: 1,
-        },
-        {
-          name: "variation_index",
-          label: "Animal Sequence Index (variation_index)",
-          field_type: "number",
-          required: false,
-          default_value: 0,
-          description:
-            "Animal sequence index (0, 1, 2...). Human tiers (normal, freak, total) automatically enforce 0.",
-          min: 0,
-          max: 1000,
-          step: 1,
-        },
-        {
-          name: "body_color",
-          label: "Animal Body Color Hex (Optional)",
-          field_type: "text",
-          required: false,
-          default_value: "",
-          description:
-            "Optional #RRGGBB hex color (e.g. #D9A066) for animal character types only; omitted for human types.",
-        },
-        {
-          name: "pinned_species",
-          label: "Pinned Insect Species ID (Optional, Insects only)",
-          field_type: "text",
-          required: false,
-          default_value: "",
-          description:
-            "Optional valid insect species ID (1-64 chars) when tier='insects'; omitted for all other types.",
-        },
-      ],
-    },
-    "soul-v2-i2i": {
-      addFields: [
-        {
-          name: "batch_size",
-          label: "Batch Size",
-          field_type: "select",
-          required: false,
-          default_value: 1,
-          description: "Number of images to generate (1 or 4).",
-          options: [
-            { label: "1 Image", value: "1" },
-            { label: "4 Images", value: "4" },
-          ],
-          after: "aspect_ratio",
-        },
-        {
-          name: "seed",
-          label: "Seed (Optional)",
-          field_type: "number",
-          required: false,
-          default_value: null,
-          description: "Optional integer seed for reproducible image generation.",
-          min: 1,
-          step: 1,
-          after: "enhance_prompt",
-        },
-      ],
-    },
-    "soul-cinema": {
-      addFields: [
-        {
-          name: "batch_size",
-          label: "Batch Size",
-          field_type: "select",
-          required: false,
-          default_value: 1,
-          description: "Number of images to generate (1 or 4).",
-          options: [
-            { label: "1 Image", value: "1" },
-            { label: "4 Images", value: "4" },
-          ],
-          after: "resolution",
-        },
-        {
-          name: "enhance_prompt",
-          label: "Enhance Prompt",
-          field_type: "boolean",
-          required: false,
-          default_value: true,
-          description: "Automatically enrich prompt with cinematic lens and lighting details.",
-          after: "batch_size",
-        },
-        {
-          name: "seed",
-          label: "Seed (Optional)",
-          field_type: "number",
-          required: false,
-          default_value: null,
-          description: "Optional integer seed.",
-          min: 1,
-          step: 1,
-          after: "enhance_prompt",
-        },
-      ],
-    },
-    "cinema-studio-4": {
-      addFields: [
-        {
-          name: "aspect_ratio",
-          label: "Aspect Ratio",
-          field_type: "select",
-          required: false,
-          default_value: "16:9",
-          description: "Frame aspect ratio.",
-          options: [
-            { label: "16:9", value: "16:9" },
-            { label: "21:9", value: "21:9" },
-            { label: "9:16", value: "9:16" },
-            { label: "4:3", value: "4:3" },
-            { label: "1:1", value: "1:1" },
-          ],
-          after: "resolution",
-        },
-        {
-          name: "generate_audio",
-          label: "Generate Synchronized Audio",
-          field_type: "boolean",
-          required: false,
-          default_value: true,
-          description: "Synthesize synchronized scene audio.",
-          after: "aspect_ratio",
-        },
-      ],
-    },
-    "kling-3.0-pro-t2v": {
-      verified_schema: true,
-      badge: "Verified Schema",
-      pricing_hint: "$0.056 - $0.084 / sec",
-      doc_url: "https://open.higgsfield.ai/models/kling-video/v3.0/std/text-to-video/playground",
-      verification_note:
-        "Verified via Kling 3.0 Playground ($0.056-$0.084/s, 3-15s, sound, cfg_scale, multi_shots).",
-      patchField: {
-        duration: { min: 3, max: 15, step: 1, description: "Clip duration from 3 to 15 seconds (default: 5)." },
-      },
-      addFields: [
-        {
-          name: "sound",
-          label: "Native Audio (sound)",
-          field_type: "select",
-          required: false,
-          default_value: "on",
-          description: "Generate native synchronized sound ('on' or 'off').",
-          options: [
-            { label: "Sound On", value: "on" },
-            { label: "Sound Off", value: "off" },
-          ],
-          after: "aspect_ratio",
-        },
-        {
-          name: "cfg_scale",
-          label: "Prompt Adherence (cfg_scale)",
-          field_type: "number",
-          required: false,
-          default_value: 0.5,
-          description: "Classifier-free guidance scale from 0.0 to 1.0 (default: 0.5).",
-          min: 0.0,
-          max: 1.0,
-          step: 0.1,
-          after: "sound",
-        },
-        {
-          name: "multi_shots",
-          label: "Enable Multi-Shot Cuts",
-          field_type: "boolean",
-          required: false,
-          default_value: false,
-          description: "Allow multi-shot camera cuts within the generated clip.",
-          after: "cfg_scale",
-        },
-      ],
-    },
-    "ltx-2.5-pro-t2v": {
-      addFields: [
-        {
-          name: "duration",
-          label: "Duration (seconds)",
-          field_type: "number",
-          required: false,
-          default_value: 5,
-          description: "Clip duration in seconds (default: 5).",
-          min: 5,
-          max: 10,
-          step: 1,
-          after: "prompt",
-        },
-        {
-          name: "resolution",
-          label: "Resolution Tier",
-          field_type: "select",
-          required: false,
-          default_value: "720p",
-          description: "Output resolution tier.",
-          options: [
-            { label: "720p", value: "720p" },
-            { label: "1080p", value: "1080p" },
-          ],
-          after: "duration",
-        },
-        {
-          name: "seed",
-          label: "Seed (Optional)",
-          field_type: "number",
-          required: false,
-          default_value: null,
-          description: "Optional integer seed.",
-          min: 1,
-          step: 1,
-          after: "aspect_ratio",
-        },
-      ],
-    },
-    "marketing-studio-image": {
-      verified_schema: true,
-      badge: "Verified Schema",
-      pricing_hint: "$0.0138 - $0.6136 / image",
-      verification_note:
-        "Full schema verified via Marketing Studio Image Playground ($0.0138 at 1k low to $0.6136 at 4k high).",
-      fields: [
-        {
-          name: "prompt",
-          label: "Campaign Prompt",
-          field_type: "textarea",
-          required: true,
-          default_value: "",
-          description: "Product, lighting, packaging, and campaign scene description.",
-        },
-        {
-          name: "image_urls",
-          label: "Product / Reference Images (Optional, up to 16)",
-          field_type: "image_urls",
-          required: false,
-          default_value: [],
-          description: "Optional up to 16 product, packaging, or style reference image URLs.",
-        },
-        {
-          name: "resolution",
-          label: "Resolution Tier",
-          field_type: "select",
-          required: false,
-          default_value: "2k",
-          description: "1k ($0.0138+), 2k ($0.0189+), or 4k ($0.6136).",
-          options: [
-            { label: "1k", value: "1k" },
-            { label: "2k", value: "2k" },
-            { label: "4k", value: "4k" },
-          ],
-        },
-        {
-          name: "quality",
-          label: "Quality Tier",
-          field_type: "select",
-          required: false,
-          default_value: "high",
-          description: "Rendering quality tier.",
-          options: [
-            { label: "Low", value: "low" },
-            { label: "Medium", value: "medium" },
-            { label: "High", value: "high" },
-          ],
-        },
-        {
-          name: "aspect_ratio",
-          label: "Aspect Ratio",
-          field_type: "select",
-          required: false,
-          default_value: "auto",
-          description: "Output aspect ratio (defaults to 'auto').",
-          options: [
-            { label: "Auto", value: "auto" },
-            { label: "4:5", value: "4:5" },
-            { label: "1:1", value: "1:1" },
-            { label: "16:9", value: "16:9" },
-            { label: "9:16", value: "9:16" },
-            { label: "3:4", value: "3:4" },
-            { label: "4:3", value: "4:3" },
-          ],
-        },
-        {
-          name: "moderation",
-          label: "Moderation Level",
-          field_type: "select",
-          required: false,
-          default_value: "auto",
-          description: "Safety moderation filter mode.",
-          options: [
-            { label: "Auto", value: "auto" },
-            { label: "Low", value: "low" },
-          ],
-        },
-        {
-          name: "enhance_prompt",
-          label: "Enhance Prompt",
-          field_type: "boolean",
-          required: false,
-          default_value: false,
-          description: "Automatically expand campaign prompt details.",
-        },
-      ],
-    },
-    "speak-v2-audio-video": {
-      patchField: {
-        duration: {
-          options: [
-            { label: "Short", value: "short" },
-            { label: "Medium", value: "medium" },
-            { label: "Long", value: "long" },
-          ],
-          min: null,
-        },
-      },
-    },
-  };
+  const VERIFIED_MODEL_PATCHES = {};
 
   function applyVerifiedModelPatch(model) {
     const patch = VERIFIED_MODEL_PATCHES[model.id];
@@ -1812,6 +1211,8 @@
     if (!model) return;
     state.activeModel = model;
     state.formValues = {};
+    state.refVideoDuration = 5;
+    state.refVideoRawDuration = null;
 
     for (const field of model.fields) {
       state.formValues[field.name] = structuredClone(field.default_value);
@@ -1827,6 +1228,56 @@
     renderModelList();
     renderFormFields();
     onParametersChanged();
+  }
+
+  function probeVideoDuration(source, onUpdated) {
+    if (!source) return;
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    let objectUrl = null;
+
+    const cleanup = () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    const applyDetected = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        const rawSec = video.duration;
+        const billedSec = Math.min(30, Math.max(4, Math.ceil(rawSec)));
+        state.refVideoRawDuration = rawSec;
+        state.refVideoDuration = billedSec;
+        if (onUpdated) onUpdated(rawSec, billedSec);
+        onParametersChanged();
+      }
+      cleanup();
+    };
+
+    video.onloadedmetadata = applyDetected;
+    video.onerror = () => {
+      if (typeof source === "string" && video.crossOrigin) {
+        // Retry once without crossOrigin for CDNs that omit CORS headers on metadata
+        video.removeAttribute("crossOrigin");
+        video.onerror = cleanup;
+        video.src = source;
+        return;
+      }
+      cleanup();
+    };
+
+    if (typeof source === "string") {
+      if (!source.startsWith("http://") && !source.startsWith("https://")) return;
+      video.crossOrigin = "anonymous";
+      video.src = source;
+    } else if (source instanceof Blob) {
+      objectUrl = URL.createObjectURL(source);
+      video.src = objectUrl;
+    }
   }
 
   function getEffectiveEndpoint() {
@@ -1914,16 +1365,19 @@
 
   /**
    * 0ms Instant Local Tier Cost Calculator
+   * 1 Higgsfield Credit = $0.0625 USD (16 credits = $1.00 USD)
    */
   function calculateInstantTierCost() {
     const dict = t();
     const endpoint = getEffectiveEndpoint();
     const v = state.formValues;
     const duration = Math.max(1, Number(v.duration) || 5);
+    const refSec = Math.min(30, Math.max(4, Number(state.refVideoDuration) || 5));
     const res = String(v.resolution || "720p").toLowerCase();
     const audioOn = v.generate_audio !== false;
     const bitrate = String(v.bitrate_mode || "high").toLowerCase();
     const batchSize = Math.max(1, Number(v.batch_size) || 1);
+    const CREDIT_USD = 0.0625;
 
     let usd = 0;
     let credits = 0;
@@ -1939,7 +1393,7 @@
       const bitMult = bitrate === "standard" ? 0.92 : 1.0;
       const rate = baseRatePerSec * audioMult * bitMult;
       usd = rate * duration;
-      credits = usd / 0.049;
+      credits = usd / CREDIT_USD;
       parts.push(
         `${duration}s`,
         res,
@@ -1955,10 +1409,14 @@
         res === "480p" ? 0.1728 : res === "1080p" ? 0.796 : 0.382;
       const audioMult = audioOn ? 1.0 : 0.88;
       const bitMult = bitrate === "standard" ? 0.92 : 1.0;
-      usd = baseRatePerSec * audioMult * bitMult * duration;
-      credits = usd / 0.049;
+      const effectiveSec =
+        endpoint.includes("video-edit") && state.refVideoRawDuration !== null
+          ? refSec
+          : duration;
+      usd = baseRatePerSec * audioMult * bitMult * effectiveSec;
+      credits = usd / CREDIT_USD;
       parts.push(
-        `${duration}s`,
+        `${effectiveSec}s`,
         res,
         audioOn ? dict.breakdownAudioOn : dict.breakdownAudioOff
       );
@@ -1967,7 +1425,7 @@
       const ratePerSec =
         res === "480p" ? 0.0272 : res === "720p" ? 0.056 : 0.112;
       usd = ratePerSec * duration;
-      credits = usd / 0.049;
+      credits = usd / CREDIT_USD;
       parts.push(
         `${duration}s`,
         res,
@@ -1978,7 +1436,7 @@
       const ratePerSec =
         res === "480p" ? 0.02 : res === "1080p" ? 0.08 : 0.04;
       usd = ratePerSec * duration;
-      credits = usd / 0.049;
+      credits = usd / CREDIT_USD;
       parts.push(
         `${duration}s`,
         res,
@@ -1986,33 +1444,56 @@
       );
       if (v.enable_thinking) parts.push(dict.breakdownThinkingOn);
     } else if (endpoint.includes("genjutsu/restyle")) {
-      const ratePerSec =
-        res === "480p" ? 0.318 : res === "1080p" ? 1.632 : 0.681;
-      const clipSec = Number(v.duration) || 5;
-      usd = ratePerSec * clipSec;
-      credits = usd / 0.049;
-      parts.push(`~${clipSec}s ref`, res);
+      // Official Genjutsu Restyle rate: 5.09 cr/s (480p), 10.90 cr/s (720p), 26.11 cr/s (1080p)
+      const listCreditsPerSec =
+        res === "480p" ? 5.09 : res === "1080p" ? 26.11 : 10.9;
+      const listCredits = listCreditsPerSec * refSec;
+      const listUsd = listCredits * CREDIT_USD;
+      const discMult =
+        state.hasKey && state.accountDiscountPct > 0
+          ? 1 - state.accountDiscountPct / 100
+          : 1.0;
+      usd = listUsd * discMult;
+      credits = listCredits * discMult;
+      parts.push(
+        state.refVideoRawDuration !== null ? `${refSec}s ref` : `~${refSec}s ref`,
+        res
+      );
+      if (discMult < 1.0) {
+        parts.push(dict.beforeDiscountList(`$${listUsd.toFixed(2)}`));
+      }
     } else if (endpoint.includes("genjutsu")) {
-      const ratePerSec =
-        res === "480p" ? 0.159 : res === "1080p" ? 0.816 : 0.34;
-      const clipSec = Number(v.duration) || 5;
-      usd = ratePerSec * clipSec;
-      credits = usd / 0.049;
-      parts.push(`~${clipSec}s ref`, res);
+      // Official Genjutsu Motion Transfer & Object Swap rate: 2.544 cr/s (480p), 5.43 cr/s (720p), 13.056 cr/s (1080p)
+      const listCreditsPerSec =
+        res === "480p" ? 2.544 : res === "1080p" ? 13.056 : 5.43;
+      const listCredits = listCreditsPerSec * refSec;
+      const listUsd = listCredits * CREDIT_USD;
+      const discMult =
+        state.hasKey && state.accountDiscountPct > 0
+          ? 1 - state.accountDiscountPct / 100
+          : 1.0;
+      usd = listUsd * discMult;
+      credits = listCredits * discMult;
+      parts.push(
+        state.refVideoRawDuration !== null ? `${refSec}s ref` : `~${refSec}s ref`,
+        res
+      );
+      if (discMult < 1.0) {
+        parts.push(dict.beforeDiscountList(`$${listUsd.toFixed(2)}`));
+      }
     } else if (endpoint.includes("soul/v2")) {
-      const perImageUsd = res === "720p" ? 0.0032 : 0.0057;
-      const perImageCr = res === "720p" ? 0.032 : 0.05;
+      const perImageUsd = res === "720p" ? 0.004 : 0.006;
       usd = perImageUsd * batchSize;
-      credits = perImageCr * batchSize;
+      credits = usd / CREDIT_USD;
       parts.push(`${batchSize} img`, res, String(v.aspect_ratio || "3:4"));
     } else if (endpoint.includes("soul/cinema")) {
       const perImageUsd = res === "720p" ? 0.004 : 0.006;
       usd = perImageUsd * batchSize;
-      credits = usd / 0.0625;
+      credits = usd / CREDIT_USD;
       parts.push(`${batchSize} img`, res, String(v.aspect_ratio || "16:9"));
     } else if (endpoint.includes("ai-influencer")) {
       usd = 0.05;
-      credits = 1.0;
+      credits = usd / CREDIT_USD;
       parts.push(`tier: ${v.tier || "normal"}`, dict.breakdownSheet);
     } else if (endpoint.includes("soul-id")) {
       usd = 2.5;
@@ -2021,44 +1502,52 @@
     } else if (endpoint.includes("cinema-studio")) {
       const ratePerSec = res === "480p" ? 0.2057 : 0.4623;
       usd = ratePerSec * duration;
-      credits = usd / 0.049;
+      credits = usd / CREDIT_USD;
       parts.push(`${duration}s`, res, String(v.aspect_ratio || "16:9"));
     } else if (endpoint.includes("kling-video/v3.0")) {
       const soundOn = String(v.sound || "on") === "on";
-      const ratePerSec = soundOn ? 0.084 : 0.056;
+      const ratePerSec = soundOn ? 0.1428 : 0.0952;
       usd = ratePerSec * duration;
-      credits = usd / 0.05;
+      credits = usd / CREDIT_USD;
       parts.push(
         `${duration}s`,
         soundOn ? dict.breakdownSoundOn : dict.breakdownSoundOff,
         String(v.aspect_ratio || "16:9")
       );
     } else if (endpoint.includes("ltx-2.5")) {
-      const ratePerSec = res === "1080p" ? 0.06 : 0.04;
+      const ratePerSec = res === "1080p" ? 0.17 : 0.12;
       usd = ratePerSec * duration;
-      credits = usd / 0.05;
+      credits = usd / CREDIT_USD;
       parts.push(`${duration}s`, res, String(v.aspect_ratio || "16:9"));
     } else if (endpoint.includes("recraft")) {
-      usd = res === "1k" ? 0.105 : 0.21;
-      credits = usd / 0.0625;
-      parts.push(res, String(v.aspect_ratio || "16:9"));
+      usd = 0.21;
+      credits = usd / CREDIT_USD;
+      parts.push(res || "2k", String(v.aspect_ratio || "16:9"));
     } else if (endpoint.includes("grok-imagine")) {
-      const qualMult = v.quality === "high" ? 1.5 : 1.0;
-      const resMult = res === "2k" ? 1.4 : 1.0;
-      usd = 0.07 * qualMult * resMult;
-      credits = 1.12 * qualMult * resMult;
-      parts.push(res, String(v.quality || "medium"));
+      const qual = String(v.quality || "medium").toLowerCase();
+      usd =
+        res === "2k"
+          ? qual === "low"
+            ? 0.06
+            : 0.08
+          : qual === "low"
+          ? 0.04
+          : 0.07;
+      credits = usd / CREDIT_USD;
+      parts.push(res, qual);
     } else if (endpoint.includes("marketing-studio")) {
       const qual = String(v.quality || "high").toLowerCase();
-      const baseResUsd = res === "1k" ? 0.0138 : res === "4k" ? 0.24 : 0.0189;
-      const qualMult =
-        qual === "high" ? (res === "4k" ? 2.556 : 1.8) : qual === "medium" ? 1.35 : 1.0;
-      usd = baseResUsd * qualMult;
-      credits = usd / 0.05;
+      const table = {
+        "1k": { low: 0.0138, medium: 0.0439, high: 0.138 },
+        "2k": { low: 0.0189, medium: 0.0665, high: 0.2045 },
+        "4k": { low: 0.0565, medium: 0.2, high: 0.6136 },
+      };
+      usd = table[res]?.[qual] ?? 0.2045;
+      credits = usd / CREDIT_USD;
       parts.push(res, qual, String(v.aspect_ratio || "auto"));
     } else {
       usd = 0.25 * duration;
-      credits = usd / 0.05;
+      credits = usd / CREDIT_USD;
       parts.push(res || "default");
     }
 
@@ -2085,6 +1574,7 @@
       ? dict.syncingEstimate
       : dict.instantTierCalc;
     liveCostSourceBadge.className = "live-cost-source-badge";
+    liveCostSourceBadge.removeAttribute("title");
     if (!state.isSubmitting && submitBtnText) {
       submitBtnText.textContent = `${dict.generateMedia} · ${est.usdStr}`;
     }
@@ -2143,9 +1633,17 @@
 
       const discountObj =
         data.discount && typeof data.discount === "object" ? data.discount : null;
-      const rawCredits =
-        discountObj?.credits ?? data.credits ?? data.cost?.credits ?? null;
-      const rawUsd = discountObj?.usd ?? data.usd ?? data.cost?.usd ?? null;
+      if (discountObj && discountObj.percentage !== undefined) {
+        const parsedPct = parseFloat(String(discountObj.percentage));
+        if (!Number.isNaN(parsedPct) && parsedPct >= 0 && parsedPct < 100) {
+          state.accountDiscountPct = parsedPct;
+        }
+      }
+
+      // IMPORTANT: data.usd and data.credits are the net price charged;
+      // discountObj.usd and discountObj.credits are the savings subtracted!
+      const rawCredits = data.credits ?? data.cost?.credits ?? null;
+      const rawUsd = data.usd ?? data.cost?.usd ?? null;
 
       if (rawUsd !== null || rawCredits !== null) {
         if (rawUsd !== null) {
@@ -2163,10 +1661,31 @@
         if (rawCredits !== null) {
           liveCostCredits.textContent = `${rawCredits} ${dict.creditsUnit}`;
         }
-        liveCostSourceBadge.textContent = discountObj
-          ? dict.accountQuoteDiscount(discountObj.percentage || "Discount")
+        liveCostSourceBadge.textContent = discountObj?.percentage
+          ? dict.accountQuoteDiscount(discountObj.percentage)
           : dict.verifiedAccountQuote;
         liveCostSourceBadge.className = "live-cost-source-badge verified-api";
+        liveCostSourceBadge.removeAttribute("title");
+      } else if (data.type === "description" || typeof data.pricing_description === "string") {
+        // Endpoints like Genjutsu, Seedance 2.5, and Wan 3.0 return { type: "description", pricing_description: "..." }
+        const est = calculateInstantTierCost();
+        liveCostUsd.textContent = est.usdStr;
+        liveCostCredits.textContent = est.creditsStr;
+        liveCostBreakdown.textContent = est.breakdownStr;
+        if (!state.isSubmitting && submitBtnText) {
+          submitBtnText.textContent = `${dict.generateMedia} · ${est.usdStr}`;
+        }
+        liveCostSourceBadge.textContent =
+          state.accountDiscountPct > 0
+            ? dict.accountQuoteDiscount(`${state.accountDiscountPct}%`)
+            : dict.verifiedRateTable;
+        liveCostSourceBadge.className = "live-cost-source-badge verified-api";
+        if (data.pricing_description) {
+          liveCostSourceBadge.title = data.pricing_description;
+        }
+      } else {
+        liveCostSourceBadge.textContent = dict.instantTierCalc;
+        liveCostSourceBadge.className = "live-cost-source-badge";
       }
     } catch (_) {
       if (seq === state.estimateRequestSeq) {
@@ -2484,8 +2003,11 @@
 
         const chipsRow = document.createElement("div");
         chipsRow.className = "duration-chips";
-        const presetSecs = [3, 4, 5, 8, 10, 15, 20, 30].filter(
-          (s) => s >= (field.min ?? 2) && s <= (field.max ?? 30)
+        const minSec = field.min ?? 2;
+        const maxSec = field.max ?? 30;
+        const stepSec = field.step ?? 1;
+        const presetSecs = [3, 4, 5, 6, 8, 10, 15, 20, 30].filter(
+          (s) => s >= minSec && s <= maxSec && (s - minSec) % stepSec === 0
         );
 
         const updateDurationUI = (valNum) => {
@@ -2579,9 +2101,20 @@
         };
         updateThumb(input.value);
 
+        let syncRefDurationUI = null;
+
         input.addEventListener("input", () => {
-          state.formValues[field.name] = input.value.trim();
-          updateThumb(input.value.trim());
+          const val = input.value.trim();
+          state.formValues[field.name] = val;
+          updateThumb(val);
+          if (field.field_type === "video_url" && val) {
+            probeVideoDuration(val, (_rawSec, billedSec) => {
+              if ("duration" in state.formValues) {
+                state.formValues.duration = billedSec;
+              }
+              if (syncRefDurationUI) syncRefDurationUI();
+            });
+          }
           onParametersChanged();
         });
 
@@ -2602,6 +2135,15 @@
         uploadBtn.addEventListener("click", () => fileInput.click());
 
         const handleSingleFile = async (file) => {
+          if (field.field_type === "video_url") {
+            // Immediately probe local video metadata (0ms) before upload completes
+            probeVideoDuration(file, (_rawSec, billedSec) => {
+              if ("duration" in state.formValues) {
+                state.formValues.duration = billedSec;
+              }
+              if (syncRefDurationUI) syncRefDurationUI();
+            });
+          }
           uploadBtn.disabled = true;
           uploadBtn.textContent = dict.uploading;
           try {
@@ -2635,17 +2177,120 @@
         dropzone.appendChild(topRow);
         dropzone.appendChild(row);
         dropzone.appendChild(previewBox);
+
+        // Reference Video Duration Bar for video-input models (especially Genjutsu)
+        const modelHasOwnDurationField = state.activeModel.fields.some(
+          (f) => f.name === "duration"
+        );
+        if (field.field_type === "video_url" && !modelHasOwnDurationField) {
+          const refDurBox = document.createElement("div");
+          refDurBox.className = "ref-video-duration-bar";
+
+          const refTop = document.createElement("div");
+          refTop.className = "ref-video-duration-top";
+
+          const refLabel = document.createElement("span");
+          refLabel.className = "ref-video-duration-label";
+          refLabel.textContent = dict.refVideoDurationLabel;
+
+          const refStatusBadge = document.createElement("span");
+          refStatusBadge.className = "ref-video-duration-status";
+
+          refTop.appendChild(refLabel);
+          refTop.appendChild(refStatusBadge);
+
+          const sliderRow = document.createElement("div");
+          sliderRow.className = "duration-slider-row";
+
+          const refSlider = document.createElement("input");
+          refSlider.type = "range";
+          refSlider.className = "duration-slider";
+          refSlider.min = "4";
+          refSlider.max = "30";
+          refSlider.step = "1";
+          refSlider.value = String(state.refVideoDuration || 5);
+
+          const refValBadge = document.createElement("span");
+          refValBadge.className = "duration-value-badge";
+          refValBadge.textContent = `${refSlider.value}s`;
+
+          const refChips = document.createElement("div");
+          refChips.className = "duration-chips";
+          const refPresetSecs = [4, 5, 8, 10, 15, 20, 30];
+
+          syncRefDurationUI = () => {
+            const d = t();
+            const sec = Math.min(30, Math.max(4, Number(state.refVideoDuration) || 5));
+            refSlider.value = String(sec);
+            refValBadge.textContent = `${sec}s`;
+            if (state.refVideoRawDuration !== null) {
+              refStatusBadge.textContent = d.refVideoDetectedBadge(
+                state.refVideoRawDuration,
+                sec
+              );
+              refStatusBadge.classList.add("detected");
+            } else {
+              refStatusBadge.textContent = d.refVideoManualBadge(sec);
+              refStatusBadge.classList.remove("detected");
+            }
+            refChips.querySelectorAll(".duration-chip").forEach((c) => {
+              c.classList.toggle("active", Number(c.dataset.sec) === sec);
+            });
+          };
+
+          const setManualRefDuration = (secNum) => {
+            state.refVideoDuration = secNum;
+            state.refVideoRawDuration = null;
+            syncRefDurationUI();
+            onParametersChanged();
+          };
+
+          for (const sec of refPresetSecs) {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className =
+              "duration-chip" + (state.refVideoDuration === sec ? " active" : "");
+            chip.dataset.sec = String(sec);
+            chip.textContent = `${sec}s`;
+            chip.addEventListener("click", () => setManualRefDuration(sec));
+            refChips.appendChild(chip);
+          }
+
+          refSlider.addEventListener("input", () => {
+            setManualRefDuration(Number(refSlider.value));
+          });
+
+          sliderRow.appendChild(refSlider);
+          sliderRow.appendChild(refValBadge);
+          refDurBox.appendChild(refTop);
+          refDurBox.appendChild(sliderRow);
+          refDurBox.appendChild(refChips);
+          syncRefDurationUI();
+          dropzone.appendChild(refDurBox);
+        }
+
         wrapper.appendChild(dropzone);
       }
-      // 8. Studio Media Dropzone for Multi-Image URLs
-      else if (field.field_type === "image_urls") {
+      // 8. Studio Media Dropzone for Multi-Media URLs (image_urls, audio_urls, video_urls)
+      else if (
+        field.field_type === "image_urls" ||
+        field.field_type === "audio_urls" ||
+        field.field_type === "video_urls"
+      ) {
         const dropzone = document.createElement("div");
         dropzone.className = "studio-dropzone";
+
+        const dropHeaderLabel =
+          field.field_type === "audio_urls"
+            ? dict.dropMultiAudios
+            : field.field_type === "video_urls"
+            ? dict.dropMultiVideos
+            : dict.dropMultiImages;
 
         const topRow = document.createElement("div");
         topRow.className = "dropzone-header-row";
         topRow.innerHTML = `<span class="dropzone-Format-tag">${escapeHtml(
-          dict.dropMultiImages
+          dropHeaderLabel
         )}</span>`;
 
         const listContainer = document.createElement("div");
@@ -2700,7 +2345,12 @@
         fileInput.type = "file";
         fileInput.multiple = true;
         fileInput.hidden = true;
-        fileInput.accept = "image/png,image/jpeg,image/webp";
+        fileInput.accept =
+          field.field_type === "audio_urls"
+            ? "audio/wav,audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/aac,audio/ogg"
+            : field.field_type === "video_urls"
+            ? "video/mp4,video/quicktime,video/webm"
+            : "image/png,image/jpeg,image/webp";
 
         const uploadBtn = document.createElement("button");
         uploadBtn.type = "button";
@@ -2866,6 +2516,18 @@
     }
 
     const endpoint = getEffectiveEndpoint();
+    if (
+      endpoint === "bytedance/seedance-2.5/reference-to-video" &&
+      !useCustomJsonToggle.checked
+    ) {
+      const hasAnyRef = ["image_urls", "audio_urls", "video_urls"].some(
+        (k) => Array.isArray(payload[k]) && payload[k].length > 0
+      );
+      if (!hasAnyRef) {
+        showFormError(t().missingR2vRefError);
+        return;
+      }
+    }
     const idempotencyKey = generateUuid();
 
     state.isSubmitting = true;
@@ -2945,31 +2607,61 @@
     activePollsBadge.textContent = count > 0 ? t().activeCount(count) : t().idle;
   }
 
+  async function pollJobOnce(requestId, isManual = false) {
+    const prevJob = state.jobs.find((j) => j.request_id === requestId);
+    const prevStatus = prevJob?.status;
+    const prevVideo = prevJob?.video_url;
+    const prevImages = Array.isArray(prevJob?.image_urls)
+      ? prevJob.image_urls.length
+      : 0;
+    const prevAudio = prevJob?.audio_url;
+
+    const res = await fetch(`/api/requests/${encodeURIComponent(requestId)}/status`);
+    const data = await res.json();
+    if (res.ok && data.request_id) {
+      const changed =
+        prevStatus !== data.status ||
+        prevVideo !== data.video_url ||
+        prevImages !== (Array.isArray(data.image_urls) ? data.image_urls.length : 0) ||
+        prevAudio !== data.audio_url;
+
+      upsertJob(data);
+      if ((changed || isManual) && state.activeStageJobId === requestId) {
+        renderOutputStage();
+      }
+      if (changed || isManual) {
+        renderJobsList();
+      }
+
+      if (TERMINAL_STATUSES.has(data.status)) {
+        const existingTimer = state.pollingTimers.get(requestId);
+        if (existingTimer) clearTimeout(existingTimer);
+        state.pollingTimers.delete(requestId);
+        updatePollsCounter();
+        if (prevStatus && !TERMINAL_STATUSES.has(prevStatus)) {
+          if (data.status === "completed") {
+            showToast(t().completedToast(requestId.slice(0, 8)), "ok");
+          } else {
+            showToast(t().endedStatusToast(data.status), "warn");
+          }
+        }
+      } else if (isManual) {
+        showToast(t().statusRefreshedToast(formatStatusLabel(data.status)), "ok");
+      }
+      return data;
+    }
+    return null;
+  }
+
   function startPollingJob(requestId) {
     if (state.pollingTimers.has(requestId)) return;
     let delayMs = 2000;
 
     const pollStep = async () => {
       try {
-        const res = await fetch(`/api/requests/${encodeURIComponent(requestId)}/status`);
-        const data = await res.json();
-        if (res.ok && data.request_id) {
-          upsertJob(data);
-          if (state.activeStageJobId === requestId) {
-            renderOutputStage();
-          }
-          renderJobsList();
-
-          if (TERMINAL_STATUSES.has(data.status)) {
-            state.pollingTimers.delete(requestId);
-            updatePollsCounter();
-            if (data.status === "completed") {
-              showToast(t().completedToast(requestId.slice(0, 8)), "ok");
-            } else {
-              showToast(t().endedStatusToast(data.status), "warn");
-            }
-            return;
-          }
+        const data = await pollJobOnce(requestId, false);
+        if (data && TERMINAL_STATUSES.has(data.status)) {
+          return;
         }
       } catch (_) {}
 
@@ -3117,6 +2809,14 @@
           sendImageToModel(firstImg, "seedance-2.5-i2v")
         );
 
+        const toSeedanceR2v = document.createElement("button");
+        toSeedanceR2v.type = "button";
+        toSeedanceR2v.className = "btn btn-ghost btn-xs";
+        toSeedanceR2v.textContent = dict.animateSeedanceR2v;
+        toSeedanceR2v.addEventListener("click", () =>
+          sendImageToModel(firstImg, "seedance-2.5-r2v")
+        );
+
         const toWanPrimeI2v = document.createElement("button");
         toWanPrimeI2v.type = "button";
         toWanPrimeI2v.className = "btn btn-ghost btn-xs";
@@ -3134,6 +2834,7 @@
         );
 
         chainBar.appendChild(toSeedanceI2v);
+        chainBar.appendChild(toSeedanceR2v);
         chainBar.appendChild(toWanPrimeI2v);
         chainBar.appendChild(toGenjutsu);
         card.appendChild(chainBar);
@@ -3164,14 +2865,37 @@
           <p class="empty-stage-sub">${dict.pollingSub(escapeHtml(job.request_id))}</p>
         </div>
       `;
+
+      const actionRow = document.createElement("div");
+      actionRow.className = "stage-status-actions";
+
+      const refreshBtn = document.createElement("button");
+      refreshBtn.type = "button";
+      refreshBtn.className = "btn btn-secondary btn-sm";
+      refreshBtn.textContent = dict.refreshStatusBtn;
+      refreshBtn.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = dict.refreshingStatus;
+        try {
+          await pollJobOnce(job.request_id, true);
+        } finally {
+          if (refreshBtn.isConnected) {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = t().refreshStatusBtn;
+          }
+        }
+      });
+      actionRow.appendChild(refreshBtn);
+
       if (job.status === "queued") {
         const cancelBtn = document.createElement("button");
         cancelBtn.type = "button";
         cancelBtn.className = "btn btn-danger btn-sm";
         cancelBtn.textContent = dict.cancelQueuedBtn;
         cancelBtn.addEventListener("click", () => cancelJob(job.request_id));
-        box.appendChild(cancelBtn);
+        actionRow.appendChild(cancelBtn);
       }
+      box.appendChild(actionRow);
       card.appendChild(box);
     } else {
       const box = document.createElement("div");

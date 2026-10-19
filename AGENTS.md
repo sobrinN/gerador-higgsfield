@@ -101,11 +101,20 @@ gerador-higgsfield/
 ## 6. How to Add or Modify Models & UI Text
 
 1. **Adding/Updating a Model (`src/catalog.rs`):**
-   - Add or update a `ModelEntry` inside `get_bundled_catalog()` with its `id`, `endpoint`, `category` (`video`, `edit`, `image`, `character`, `audio`), and `fields` (`ModelField`).
+   - Add or update a `ModelEntry` inside `get_bundled_catalog()` with its `id`, `endpoint`, `category` (`video`, `edit`, `image`, `character`, `audio`), and `fields` (`ModelField`, supporting `textarea`, `text`, `number`, `select`, `boolean`, `image_url`, `image_urls`, `video_url`, `video_urls`, `audio_url`, `audio_urls`).
+   - Note on Seedance 2.5 (`additionalProperties: false` on all 5 endpoints):
+     - `image-to-video` only accepts `image_url` and `end_image_url` (no reference audio/video).
+     - `reference-to-video`, `video-edit`, and `video-extend` accept multimodal reference arrays: `image_urls` (1–30), `audio_urls` (1–10), and `video_urls` (1–10).
+     - `video-edit` derives duration from the source `video_url` and must not send `duration`.
    - If the model has conditional payload rules (e.g., fields that should be stripped unless another field is set), update `sanitize_input_payload()` in `src/main.rs`.
 2. **Bilingual UI (`static/app.js` & `static/index.html`):**
-   - The UI supports **Português (`pt-br`)** and **English (`en`)** via the `I18N` dictionary, `FIELD_LABELS_PT`, `FIELD_DESC_PT`, and `MODEL_DESC_PT` maps in `static/app.js`.
+   - The UI supports **Português (`pt-br`)** and **English (`en`)** via the `UI_I18N` dictionary, `FIELD_PT_BR`, `OPTION_PT_BR`, and `MODEL_PT_BR` maps in `static/app.js`.
    - When adding new UI strings, models, or fields, provide translations in both `pt-br` and `en`.
+3. **Cost Estimation & `/estimate/<endpoint>` Contract:**
+   - `1 Higgsfield Credit = $0.0625 USD` (`16 credits = $1.00 USD`).
+   - `POST /estimate/<endpoint>` returns either:
+     - `{"type":"estimate","credits":"...","usd":"...","discount":{"percentage":"15.00","credits":"...","usd":"..."}}` — where top-level `usd`/`credits` are the **net price charged** and `discount.usd`/`discount.credits` are the **savings subtracted**.
+     - `{"type":"description","pricing_description":"..."}` (for Genjutsu, Seedance 2.5, Wan 3.0, Cinema Studio 4.0) — where `calculateInstantTierCost()` computes the cost using `state.refVideoDuration` (auto-probed via HTML5 `<video preload="metadata">` on file drop/select or URL input) and applies the account discount (`state.accountDiscountPct`).
 
 ---
 

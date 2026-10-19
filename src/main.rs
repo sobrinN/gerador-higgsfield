@@ -373,18 +373,22 @@ fn prepare_estimate_payload(
     let mut cleaned = sanitize_input_payload(raw);
     let clean_ep = endpoint.trim().trim_start_matches('/');
 
+    let is_missing_val = |v: Option<&JsonValue>| -> bool {
+        match v {
+            None | Some(JsonValue::Null) => true,
+            Some(JsonValue::Str(s)) => s.trim().is_empty(),
+            Some(JsonValue::Array(a)) => a.is_empty(),
+            _ => false,
+        }
+    };
+
     if let Some(entry) = catalog.iter().find(|m| m.endpoint == clean_ep) {
         for field in &entry.fields {
-            if !field.required {
+            let needs_placeholder = field.required || field.name == "prompt";
+            if !needs_placeholder {
                 continue;
             }
-            let is_missing = match cleaned.get(field.name) {
-                None | Some(JsonValue::Null) => true,
-                Some(JsonValue::Str(s)) => s.trim().is_empty(),
-                Some(JsonValue::Array(a)) => a.is_empty(),
-                _ => false,
-            };
-            if is_missing {
+            if is_missing_val(cleaned.get(field.name)) {
                 let placeholder = match field.field_type {
                     "image_url" => JsonValue::Str("https://example.com/input.jpg".to_string()),
                     "video_url" => JsonValue::Str("https://example.com/input.mp4".to_string()),
@@ -394,22 +398,46 @@ fn prepare_estimate_payload(
                         arr.push(JsonValue::Str("https://example.com/input.jpg".to_string()));
                         arr
                     }
+                    "video_urls" => {
+                        let mut arr = JsonValue::arr();
+                        arr.push(JsonValue::Str("https://example.com/input.mp4".to_string()));
+                        arr
+                    }
+                    "audio_urls" => {
+                        let mut arr = JsonValue::arr();
+                        arr.push(JsonValue::Str("https://example.com/input.wav".to_string()));
+                        arr
+                    }
                     _ => JsonValue::Str("cost estimate preview".to_string()),
                 };
                 cleaned.insert(field.name, placeholder);
             }
         }
-    } else {
-        // Fallback for custom endpoints if prompt is blank
-        if let Some(JsonValue::Str(s)) = cleaned.get("prompt") {
-            if s.trim().is_empty() {
-                cleaned.insert(
-                    "prompt",
-                    JsonValue::Str("cost estimate preview".to_string()),
-                );
-            }
-        }
+    } else if is_missing_val(cleaned.get("prompt")) {
+        cleaned.insert(
+            "prompt",
+            JsonValue::Str("cost estimate preview".to_string()),
+        );
     }
+
+    if clean_ep.ends_with("reference-to-video")
+        && is_missing_val(cleaned.get("image_urls"))
+        && is_missing_val(cleaned.get("video_url"))
+        && is_missing_val(cleaned.get("video_urls"))
+        && is_missing_val(cleaned.get("audio_urls"))
+    {
+        let mut arr = JsonValue::arr();
+        arr.push(JsonValue::Str("https://example.com/input.jpg".to_string()));
+        cleaned.insert("image_urls", arr);
+    }
+
+    if clean_ep == "higgsfield/genjutsu/restyle/v1.0" && is_missing_val(cleaned.get("preset_id")) {
+        cleaned.insert(
+            "preset_id",
+            JsonValue::Str("c2143317-f28d-4c3c-a0b8-39bd547e08a7".to_string()),
+        );
+    }
+
     cleaned
 }
 
@@ -909,6 +937,25 @@ fn handle_client(mut stream: TcpStream, state: Arc<AppState>) {
             }
 
             let cleaned_input = sanitize_input_payload(&input);
+            if endpoint == "bytedance/seedance-2.5/reference-to-video" {
+                let has_refs = ["image_urls", "audio_urls", "video_urls"].iter().any(|k| {
+                    cleaned_input
+                        .get(k)
+                        .and_then(|v| v.as_array())
+                        .map(|a| !a.is_empty())
+                        .unwrap_or(false)
+                });
+                if !has_refs {
+                    send_json_response(
+                        &mut stream,
+                        400,
+                        &json_err(
+                            "Seedance 2.5 Reference-to-Video requires at least one reference item in image_urls, audio_urls, or video_urls.",
+                        ),
+                    );
+                    return;
+                }
+            }
             let idem_key = parsed
                 .get("idempotency_key")
                 .and_then(|v| v.as_str())
@@ -1157,28 +1204,35 @@ fn handle_poll_status(stream: &mut TcpStream, state: &Arc<AppState>, request_id:
 
             let now = unix_now();
             let mut updated_json = JsonValue::Null;
+            let mut status_changed = false;
 
             if let Ok(mut jobs) = state.jobs.write() {
-                let entry = jobs.entry(request_id.to_string()).or_insert_with(|| JobRecord {
-                    request_id: request_id.to_string(),
-                    owner_id: "local-studio".to_string(),
-                    model_id: "custom".to_string(),
-                    endpoint: "unknown".to_string(),
-                    model_name: "External Request".to_string(),
-                    category: "video".to_string(),
-                    status: status.clone(),
-                    prompt_summary: request_id.to_string(),
-                    created_at: now,
-                    updated_at: now,
-                    status_url: None,
-                    cancel_url: None,
-                    video_url: None,
-                    image_urls: Vec::new(),
-                    audio_url: None,
-                    error_detail: None,
-                    raw_response: None,
+                let entry = jobs.entry(request_id.to_string()).or_insert_with(|| {
+                    status_changed = true;
+                    JobRecord {
+                        request_id: request_id.to_string(),
+                        owner_id: "local-studio".to_string(),
+                        model_id: "custom".to_string(),
+                        endpoint: "unknown".to_string(),
+                        model_name: "External Request".to_string(),
+                        category: "video".to_string(),
+                        status: status.clone(),
+                        prompt_summary: request_id.to_string(),
+                        created_at: now,
+                        updated_at: now,
+                        status_url: None,
+                        cancel_url: None,
+                        video_url: None,
+                        image_urls: Vec::new(),
+                        audio_url: None,
+                        error_detail: None,
+                        raw_response: None,
+                    }
                 });
 
+                if entry.status != status {
+                    status_changed = true;
+                }
                 entry.status = status.clone();
                 entry.updated_at = now;
                 if video_url.is_some() {
@@ -1197,7 +1251,7 @@ fn handle_poll_status(stream: &mut TcpStream, state: &Arc<AppState>, request_id:
                 updated_json = entry.to_json();
             }
 
-            if TERMINAL_STATUSES.contains(&status.as_str()) {
+            if status_changed || TERMINAL_STATUSES.contains(&status.as_str()) {
                 state.persist_jobs();
             }
 
@@ -1362,7 +1416,8 @@ mod tests {
         assert!(endpoints.contains(&"higgsfield/genjutsu/restyle/v1.0"));
         assert!(endpoints.contains(&"higgsfield-ai/soul/v2/standard"));
         assert!(endpoints.contains(&"higgsfield/ai-influencer"));
-        assert!(endpoints.contains(&"higgsfield-ai/soul-id"));
+        assert!(endpoints.contains(&"soul-id"));
+        assert!(endpoints.contains(&"higgsfield/cinema-studio/4.0"));
     }
 
     #[test]
@@ -1382,6 +1437,76 @@ mod tests {
         assert_eq!(
             prepared.get("resolution").and_then(|v| v.as_str()),
             Some("1080p")
+        );
+
+        let r2v = prepare_estimate_payload(
+            &JsonValue::obj(),
+            "bytedance/seedance-2.5/reference-to-video",
+            &catalog,
+        );
+        assert!(r2v
+            .get("image_urls")
+            .and_then(|v| v.as_array())
+            .map(|a| !a.is_empty())
+            .unwrap_or(false));
+
+        let restyle = prepare_estimate_payload(
+            &JsonValue::obj(),
+            "higgsfield/genjutsu/restyle/v1.0",
+            &catalog,
+        );
+        assert_eq!(
+            restyle.get("preset_id").and_then(|v| v.as_str()),
+            Some("c2143317-f28d-4c3c-a0b8-39bd547e08a7")
+        );
+    }
+
+    #[test]
+    fn test_seedance_2_5_schemas_match_official_api_docs() {
+        let catalog = get_bundled_catalog();
+
+        let i2v = catalog
+            .iter()
+            .find(|m| m.id == "seedance-2.5-i2v")
+            .expect("seedance-2.5-i2v must exist");
+        let i2v_fields: Vec<&str> = i2v.fields.iter().map(|f| f.name).collect();
+        assert!(i2v_fields.contains(&"image_url"));
+        assert!(i2v_fields.contains(&"end_image_url"));
+        assert!(!i2v_fields.contains(&"output_format"));
+        assert!(!i2v_fields.contains(&"audio_urls"));
+
+        for id in ["seedance-2.5-r2v", "seedance-2.5-edit", "seedance-2.5-extend"] {
+            let entry = catalog.iter().find(|m| m.id == id).expect(id);
+            let names: Vec<&str> = entry.fields.iter().map(|f| f.name).collect();
+            assert!(
+                names.contains(&"audio_urls"),
+                "{} must include audio_urls",
+                id
+            );
+            assert!(
+                names.contains(&"video_urls"),
+                "{} must include video_urls",
+                id
+            );
+            assert!(
+                names.contains(&"image_urls"),
+                "{} must include image_urls",
+                id
+            );
+            assert!(
+                !names.contains(&"output_format"),
+                "{} must not send output_format (additionalProperties: false)",
+                id
+            );
+        }
+
+        let edit = catalog
+            .iter()
+            .find(|m| m.id == "seedance-2.5-edit")
+            .unwrap();
+        assert!(
+            !edit.fields.iter().any(|f| f.name == "duration"),
+            "seedance-2.5-edit must not send duration"
         );
     }
 
