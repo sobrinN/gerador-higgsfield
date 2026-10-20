@@ -175,6 +175,17 @@
       refVideoManualBadge: (sec) =>
         `${sec}s (prévia · envie um vídeo local para detectar automaticamente)`,
       beforeDiscountList: (usdStr) => `${usdStr} s/ desc.`,
+      viewLogBtn: "Ver JSON / Log",
+      jobLogModalTitle: "Log & Diagnóstico da Requisição",
+      jobLogRawLabel: "Resposta Bruta da API (/requests/{id}/status)",
+      copyJsonBtn: "Copiar JSON",
+      logFieldRequestId: "Request ID",
+      logFieldEndpoint: "Endpoint",
+      logFieldStatus: "Status",
+      logFieldElapsed: "Tempo de Processamento",
+      logFieldError: "Erro Retornado pela API",
+      genericProviderErrorHint:
+        "Nota: 'Generation failed' após o processamento indica que o worker do provedor (ex: Alibaba Wan 3.0) rejeitou ou abortou a tarefa internamente (sem cobrança de créditos). Tente reduzir a duração do vídeo de referência (ex: 5–15s) ou simplificar as referências.",
     },
     en: {
       pageTitle: "Higgsfield Studio · Local Rust Media Engine",
@@ -323,6 +334,17 @@
       refVideoManualBadge: (sec) =>
         `${sec}s (preview · upload a local video to auto-detect)`,
       beforeDiscountList: (usdStr) => `${usdStr} list`,
+      viewLogBtn: "View JSON / Log",
+      jobLogModalTitle: "Request Log & Diagnostics",
+      jobLogRawLabel: "Raw API Response (/requests/{id}/status)",
+      copyJsonBtn: "Copy JSON",
+      logFieldRequestId: "Request ID",
+      logFieldEndpoint: "Endpoint",
+      logFieldStatus: "Status",
+      logFieldElapsed: "Processing Duration",
+      logFieldError: "API Error Returned",
+      genericProviderErrorHint:
+        "Note: 'Generation failed' after processing starts indicates the upstream provider worker (e.g. Alibaba Wan 3.0) aborted the job internally (credits are auto-refunded). Try trimming your reference video (e.g. to 5–15s) or simplifying references.",
     },
   };
 
@@ -915,6 +937,11 @@
   const accountModelsModalBackdrop = document.getElementById("accountModelsModalBackdrop");
   const closeAccountModelsBtn = document.getElementById("closeAccountModelsBtn");
   const accountModelsContent = document.getElementById("accountModelsContent");
+  const jobLogModalBackdrop = document.getElementById("jobLogModalBackdrop");
+  const closeJobLogModalBtn = document.getElementById("closeJobLogModalBtn");
+  const jobLogSummaryBox = document.getElementById("jobLogSummaryBox");
+  const jobLogRawTextarea = document.getElementById("jobLogRawTextarea");
+  const copyJobLogBtn = document.getElementById("copyJobLogBtn");
   const toastContainer = document.getElementById("toastContainer");
 
   function setLanguage(lang) {
@@ -971,6 +998,9 @@
     setElText("cancelKeyModalBtn", dict.cancel);
     setElText("accountModelsTitle", dict.accountModelsTitle);
     setElText("accountModelsInstruction", dict.accountModelsInstruction);
+    setElText("jobLogModalTitle", dict.jobLogModalTitle);
+    setElText("jobLogRawLabel", dict.jobLogRawLabel);
+    setElText("copyJobLogBtn", dict.copyJsonBtn);
 
     renderKeyStatus();
     renderModelList();
@@ -3014,11 +3044,21 @@
     } else {
       const box = document.createElement("div");
       box.className = "alert-error";
+      const isGenericProviderFail =
+        job.status === "failed" &&
+        String(job.error_detail || "").trim().toLowerCase() === "generation failed";
       box.innerHTML = `
         <strong>${escapeHtml(dict.terminalStatePrefix)} ${escapeHtml(
         formatStatusLabel(job.status)
       )}</strong><br/>
         ${escapeHtml(job.error_detail || dict.terminalErrorFallback)}
+        ${
+          isGenericProviderFail
+            ? `<div class="field-hint" style="margin-top:6px; color:#ffc2c9;">${escapeHtml(
+                dict.genericProviderErrorHint
+              )}</div>`
+            : ""
+        }
       `;
       card.appendChild(box);
     }
@@ -3036,6 +3076,9 @@
       job.status
     )}">${escapeHtml(formatStatusLabel(job.status))}</span></span>
       <div style="display:flex; gap:6px;">
+        <button type="button" class="btn btn-ghost btn-xs" id="openStageJobLogBtn">${escapeHtml(
+          dict.viewLogBtn
+        )}</button>
         <button type="button" class="btn btn-ghost btn-xs" id="backToViewfinderBtn">${escapeHtml(
           dict.framePreviewBtn
         )}</button>
@@ -3053,6 +3096,11 @@
     card.appendChild(metaBar);
     outputStage.appendChild(card);
 
+    const logBtn = document.getElementById("openStageJobLogBtn");
+    if (logBtn) {
+      logBtn.addEventListener("click", () => openJobLogModal(job));
+    }
+
     const backBtn = document.getElementById("backToViewfinderBtn");
     if (backBtn) {
       backBtn.addEventListener("click", () => {
@@ -3060,6 +3108,52 @@
         renderIdleCinemaViewfinder();
       });
     }
+  }
+
+  function openJobLogModal(job) {
+    if (!job || !jobLogModalBackdrop) return;
+    const dict = t();
+    const elapsedSec =
+      job.updated_at && job.created_at && job.updated_at >= job.created_at
+        ? `${job.updated_at - job.created_at}s`
+        : "—";
+    const errText =
+      job.error_detail ||
+      job.raw_response?.error ||
+      job.raw_response?.detail ||
+      "—";
+
+    if (jobLogSummaryBox) {
+      jobLogSummaryBox.innerHTML = `
+        <div class="job-log-stat">
+          <span class="job-log-stat-label">${escapeHtml(dict.logFieldRequestId)}</span>
+          <span class="job-log-stat-val">${escapeHtml(job.request_id)}</span>
+        </div>
+        <div class="job-log-stat">
+          <span class="job-log-stat-label">${escapeHtml(dict.logFieldEndpoint)}</span>
+          <span class="job-log-stat-val">${escapeHtml(job.endpoint)}</span>
+        </div>
+        <div class="job-log-stat">
+          <span class="job-log-stat-label">${escapeHtml(dict.logFieldStatus)}</span>
+          <span class="job-log-stat-val">${escapeHtml(formatStatusLabel(job.status))} (${escapeHtml(job.status)})</span>
+        </div>
+        <div class="job-log-stat">
+          <span class="job-log-stat-label">${escapeHtml(dict.logFieldElapsed)}</span>
+          <span class="job-log-stat-val">${escapeHtml(elapsedSec)}</span>
+        </div>
+        <div class="job-log-stat" style="grid-column: 1 / -1;">
+          <span class="job-log-stat-label">${escapeHtml(dict.logFieldError)}</span>
+          <span class="job-log-stat-val" style="color:${
+            job.status === "failed" || job.status === "nsfw" ? "#ff9aa5" : "inherit"
+          };">${escapeHtml(typeof errText === "string" ? errText : JSON.stringify(errText))}</span>
+        </div>
+      `;
+    }
+
+    if (jobLogRawTextarea) {
+      jobLogRawTextarea.value = JSON.stringify(job, null, 2);
+    }
+    jobLogModalBackdrop.hidden = false;
   }
 
   function renderJobsList() {
@@ -3090,6 +3184,11 @@
       )}</span>
         </div>
         <div class="job-prompt">${escapeHtml(job.prompt_summary)}</div>
+        ${
+          job.error_detail
+            ? `<div class="job-error-snippet">${escapeHtml(job.error_detail)}</div>`
+            : ""
+        }
       `;
 
       const footer = document.createElement("div");
@@ -3099,6 +3198,14 @@
       const actions = document.createElement("div");
       actions.style.display = "flex";
       actions.style.gap = "6px";
+
+      const logBtn = document.createElement("button");
+      logBtn.type = "button";
+      logBtn.className = "btn btn-ghost btn-xs";
+      logBtn.textContent = "{ } Log";
+      logBtn.title = dict.viewLogBtn;
+      logBtn.addEventListener("click", () => openJobLogModal(job));
+      actions.appendChild(logBtn);
 
       const viewBtn = document.createElement("button");
       viewBtn.type = "button";
@@ -3194,13 +3301,18 @@
 
     document.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        if (keyModalBackdrop.hidden && accountModelsModalBackdrop.hidden) {
+        if (
+          keyModalBackdrop.hidden &&
+          accountModelsModalBackdrop.hidden &&
+          (!jobLogModalBackdrop || jobLogModalBackdrop.hidden)
+        ) {
           e.preventDefault();
           handleSubmitGeneration(null);
         }
       } else if (e.key === "Escape") {
         keyModalBackdrop.hidden = true;
         accountModelsModalBackdrop.hidden = true;
+        if (jobLogModalBackdrop) jobLogModalBackdrop.hidden = true;
       }
     });
 
@@ -3379,6 +3491,27 @@
     closeAccountModelsBtn.addEventListener("click", () => {
       accountModelsModalBackdrop.hidden = true;
     });
+
+    if (closeJobLogModalBtn) {
+      closeJobLogModalBtn.addEventListener("click", () => {
+        jobLogModalBackdrop.hidden = true;
+      });
+    }
+    if (jobLogModalBackdrop) {
+      jobLogModalBackdrop.addEventListener("click", (e) => {
+        if (e.target === jobLogModalBackdrop) {
+          jobLogModalBackdrop.hidden = true;
+        }
+      });
+    }
+    if (copyJobLogBtn && jobLogRawTextarea) {
+      copyJobLogBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(jobLogRawTextarea.value);
+          showToast(t().copiedSnippetToast, "ok");
+        } catch (_) {}
+      });
+    }
   }
 
   function escapeHtml(str) {

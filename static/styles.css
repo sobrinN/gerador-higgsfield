@@ -1674,6 +1674,50 @@ textarea:focus {
   color: var(--text-muted);
 }
 
+.job-error-snippet {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #ff9aa5;
+  background-color: rgba(224, 79, 95, 0.1);
+  border: 1px solid rgba(224, 79, 95, 0.3);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.job-log-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  background-color: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+}
+
+.job-log-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.job-log-stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.job-log-stat-val {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
 /* ==========================================
    MODALS & TOASTS
    ========================================== */

@@ -318,6 +318,24 @@
     </div>
   </div>
 
+  <!-- Job Raw Log / Diagnostic Inspector Modal -->
+  <div class="modal-backdrop" id="jobLogModalBackdrop" hidden>
+    <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="jobLogModalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="jobLogModalTitle">Log &amp; Diagnóstico da Requisição</h2>
+        <button type="button" class="btn-close" id="closeJobLogModalBtn" aria-label="Fechar modal">×</button>
+      </div>
+      <div id="jobLogSummaryBox" class="job-log-summary"></div>
+      <div class="field-group">
+        <div class="field-label-row">
+          <label for="jobLogRawTextarea" id="jobLogRawLabel">Resposta Bruta da API (/requests/{id}/status)</label>
+          <button type="button" class="btn btn-ghost btn-xs" id="copyJobLogBtn">Copiar JSON</button>
+        </div>
+        <textarea id="jobLogRawTextarea" rows="12" readonly spellcheck="false" class="mono-textarea"></textarea>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
