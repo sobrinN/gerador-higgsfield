@@ -44,4 +44,9 @@
 - **Supported `aspect_ratio` Enum & `adaptive` Default:** All 6 Wan 3.0 / Wan 3.0 Prime endpoints accept `["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"]` (default `"adaptive"`; `"21:9"` is not supported). When referencing or editing a video (`@Video1`), keeping `aspect_ratio: "adaptive"` automatically preserves the reference media's framing.
 - **Additional Multimodal References:** `reference-to-video` also accepts `audio_urls` (up to 5 WAV/MP3 files, 30s total), `file_url` (1 document `docx/xlsx/pptx/pdf/md`, forces deep thinking), and `link_url` (1 web page, not combinable with `file_url`), while `image-to-video` accepts both `image_url` (First Frame) and optional `end_image_url` (Last Frame).
 
+## 6. Avoid Full `renderFormFields()` Inside Async Media Upload / Metadata Probing Callbacks
+- **Root Cause:** When uploading local files in `video_urls` (`handleMultipleFiles`), `probeVideoDuration(files[0])` reads local `Blob` metadata in ~5–15ms while `await uploadReferenceFile(f)` is still uploading to `/api/upload` + S3/R2 (~1–3s). Calling `renderFormFields()` inside `probeVideoDuration`'s callback wipes `dynamicFieldsContainer.innerHTML = ""` mid-upload. When `uploadReferenceFile` resolves afterward, `state.formValues.video_urls.push(publicUrl)` succeeds (and the toast fires), but `renderChips()` mutates the **detached `listContainer` DOM node** from before `renderFormFields()`, leaving the visible dropzone empty on screen.
+- **Solution:** Never call `renderFormFields()` from async metadata probes; update the duration slider/badge/preset chips in-place via `syncDurationFieldInDOM(billedSec)`, and render visual `@Video1` / `@Image1` / `@Audio1` chips with media thumbnails and duration badges inside `listContainer`.
+
+
 

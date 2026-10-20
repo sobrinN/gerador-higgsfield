@@ -915,12 +915,14 @@ textarea:focus {
   gap: 8px;
 }
 
-.upload-preview-thumb img {
+.upload-preview-thumb img,
+.upload-preview-thumb video {
   width: 48px;
   height: 48px;
   object-fit: cover;
   border-radius: var(--radius-xs);
   border: 1px solid var(--border-strong);
+  background-color: #070809;
 }
 
 .ref-video-duration-bar {
@@ -966,7 +968,7 @@ textarea:focus {
 .multi-urls-list {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .multi-url-chip {
@@ -974,13 +976,66 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 9px;
+  padding: 6px 9px;
   border-radius: var(--radius-xs);
   background-color: var(--bg-elevated);
   border: 1px solid var(--border-hairline);
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  word-break: break-all;
+}
+
+.multi-url-chip-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chip-media-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
+  background-color: #070809;
+  flex-shrink: 0;
+}
+
+.multi-url-ref-tag {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background-color: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.multi-url-dur-badge {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background-color: rgba(46, 189, 133, 0.14);
+  border: 1px solid rgba(46, 189, 133, 0.35);
+  color: var(--status-ok);
+  flex-shrink: 0;
+}
+
+.multi-url-dur-badge.over-limit {
+  background-color: rgba(224, 79, 95, 0.16);
+  border-color: rgba(224, 79, 95, 0.45);
+  color: #ff9aa5;
+}
+
+.multi-url-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
 }
 
 /* Custom Animated Toggle Switch */

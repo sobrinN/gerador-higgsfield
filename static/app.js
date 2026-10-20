@@ -1837,6 +1837,21 @@
     return [Math.round(w * scale), Math.round(h * scale)];
   }
 
+  function syncDurationFieldInDOM(valNum) {
+    if (!dynamicFieldsContainer) return;
+    const durGroup = dynamicFieldsContainer.querySelector(
+      '.field-group[data-field-name="duration"]'
+    );
+    if (!durGroup) return;
+    const slider = durGroup.querySelector(".duration-slider");
+    const badge = durGroup.querySelector(".duration-value-badge");
+    if (slider) slider.value = String(valNum);
+    if (badge) badge.textContent = `${valNum}s`;
+    durGroup.querySelectorAll(".duration-chip").forEach((c) => {
+      c.classList.toggle("active", Number(c.dataset.sec) === valNum);
+    });
+  }
+
   function renderFormFields() {
     dynamicFieldsContainer.innerHTML = "";
     if (!state.activeModel) return;
@@ -2103,11 +2118,20 @@
         previewBox.className = "upload-preview-thumb";
         const updateThumb = (urlStr) => {
           previewBox.innerHTML = "";
-          if (urlStr && field.field_type === "image_url") {
+          if (!urlStr) return;
+          if (field.field_type === "image_url") {
             const img = document.createElement("img");
             img.src = urlStr;
             img.alt = "Reference preview";
             previewBox.appendChild(img);
+          } else if (field.field_type === "video_url") {
+            const vid = document.createElement("video");
+            vid.src = urlStr;
+            vid.muted = true;
+            vid.playsInline = true;
+            vid.preload = "metadata";
+            vid.className = "chip-media-thumb";
+            previewBox.appendChild(vid);
           }
         };
         updateThumb(input.value);
@@ -2122,6 +2146,7 @@
             probeVideoDuration(val, (_rawSec, billedSec) => {
               if ("duration" in state.formValues) {
                 state.formValues.duration = billedSec;
+                syncDurationFieldInDOM(billedSec);
               }
               if (syncRefDurationUI) syncRefDurationUI();
             });
@@ -2151,6 +2176,7 @@
             probeVideoDuration(file, (_rawSec, billedSec) => {
               if ("duration" in state.formValues) {
                 state.formValues.duration = billedSec;
+                syncDurationFieldInDOM(billedSec);
               }
               if (syncRefDurationUI) syncRefDurationUI();
             });
@@ -2312,10 +2338,67 @@
           const urls = Array.isArray(state.formValues[field.name])
             ? state.formValues[field.name]
             : [];
+          const refPrefix =
+            field.field_type === "video_urls"
+              ? "@Video"
+              : field.field_type === "audio_urls"
+              ? "@Audio"
+              : "@Image";
+
           urls.forEach((urlStr, idx) => {
             const chip = document.createElement("div");
             chip.className = "multi-url-chip";
-            chip.innerHTML = `<span>#${idx + 1} · ${escapeHtml(urlStr)}</span>`;
+
+            const leftGroup = document.createElement("div");
+            leftGroup.className = "multi-url-chip-left";
+
+            let vidEl = null;
+            if (field.field_type === "image_urls") {
+              const img = document.createElement("img");
+              img.src = urlStr;
+              img.alt = `${refPrefix}${idx + 1}`;
+              img.className = "chip-media-thumb";
+              leftGroup.appendChild(img);
+            } else if (field.field_type === "video_urls") {
+              vidEl = document.createElement("video");
+              vidEl.src = urlStr;
+              vidEl.muted = true;
+              vidEl.playsInline = true;
+              vidEl.preload = "metadata";
+              vidEl.className = "chip-media-thumb";
+              leftGroup.appendChild(vidEl);
+            }
+
+            const tagBadge = document.createElement("span");
+            tagBadge.className = "multi-url-ref-tag";
+            tagBadge.textContent = `${refPrefix}${idx + 1}`;
+            leftGroup.appendChild(tagBadge);
+
+            if (vidEl) {
+              const durBadge = document.createElement("span");
+              durBadge.className = "multi-url-dur-badge";
+              durBadge.hidden = true;
+              leftGroup.appendChild(durBadge);
+              vidEl.addEventListener("loadedmetadata", () => {
+                if (Number.isFinite(vidEl.duration) && vidEl.duration > 0) {
+                  durBadge.textContent = `${vidEl.duration.toFixed(1)}s`;
+                  durBadge.hidden = false;
+                  if (vidEl.duration > 30) {
+                    durBadge.classList.add("over-limit");
+                    durBadge.title =
+                      state.lang === "pt-br"
+                        ? "Limite máximo de referência é 30s totais"
+                        : "Max reference video limit is 30s total";
+                  }
+                }
+              });
+            }
+
+            const urlText = document.createElement("span");
+            urlText.className = "multi-url-text";
+            urlText.textContent = urlStr;
+            leftGroup.appendChild(urlText);
+
             const rmBtn = document.createElement("button");
             rmBtn.type = "button";
             rmBtn.className = "btn-close-xs";
@@ -2325,6 +2408,7 @@
               renderChips();
               onParametersChanged();
             });
+            chip.appendChild(leftGroup);
             chip.appendChild(rmBtn);
             listContainer.appendChild(chip);
           });
@@ -2352,7 +2436,7 @@
             probeVideoDuration(val, (_rawSec, billedSec) => {
               if ("duration" in state.formValues) {
                 state.formValues.duration = billedSec;
-                renderFormFields();
+                syncDurationFieldInDOM(billedSec);
               }
             });
           }
@@ -2382,7 +2466,7 @@
             probeVideoDuration(files[0], (_rawSec, billedSec) => {
               if ("duration" in state.formValues) {
                 state.formValues.duration = billedSec;
-                renderFormFields();
+                syncDurationFieldInDOM(billedSec);
               }
             });
           }
