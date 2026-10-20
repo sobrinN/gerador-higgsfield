@@ -39,3 +39,9 @@
   - To combine **Reference Image(s) + Reference Audio** (or Reference Video), use `bytedance/seedance-2.5/reference-to-video`, which accepts `image_urls` (`1..30`), `audio_urls` (`1..10`, normalized up to 30s total), and `video_urls` (`1..10`, normalized up to 30s total).
   - `bytedance/seedance-2.5/video-edit` and `video-extend` also accept `image_urls`, `audio_urls`, and `video_urls` alongside the required `video_url` and `prompt`. Furthermore, `video-edit` derives its duration from the source `video_url` and must **not** send `duration`.
 
+## 5. Wan 3.0 & Wan 3.0 Prime `reference-to-video` Schema (`video_urls` vs `video_url` & `aspect_ratio`)
+- **Plural `video_urls` Required:** `alibaba/wan-3.0-prime/reference-to-video` and `alibaba/wan-3.0/reference-to-video` expect **`video_urls`** (an array of 1–5 video URLs, 1–30s each, 30s total, referenced in prompts as `@Video1`, `@Video2`, etc.) — **NOT** singular `"video_url"`. Because Wan 3.0's JSON schema does not enforce `additionalProperties: false`, sending `"video_url": "https://..."` does not return HTTP 422; instead, the API **silently ignores `"video_url"`** and renders from `image_urls` + `prompt` alone.
+- **Supported `aspect_ratio` Enum & `adaptive` Default:** All 6 Wan 3.0 / Wan 3.0 Prime endpoints accept `["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"]` (default `"adaptive"`; `"21:9"` is not supported). When referencing or editing a video (`@Video1`), keeping `aspect_ratio: "adaptive"` automatically preserves the reference media's framing.
+- **Additional Multimodal References:** `reference-to-video` also accepts `audio_urls` (up to 5 WAV/MP3 files, 30s total), `file_url` (1 document `docx/xlsx/pptx/pdf/md`, forces deep thinking), and `link_url` (1 web page, not combinable with `file_url`), while `image-to-video` accepts both `image_url` (First Frame) and optional `end_image_url` (Last Frame).
+
+

@@ -106,6 +106,10 @@ gerador-higgsfield/
      - `image-to-video` only accepts `image_url` and `end_image_url` (no reference audio/video).
      - `reference-to-video`, `video-edit`, and `video-extend` accept multimodal reference arrays: `image_urls` (1–30), `audio_urls` (1–10), and `video_urls` (1–10).
      - `video-edit` derives duration from the source `video_url` and must not send `duration`.
+   - Note on Wan 3.0 & Wan 3.0 Prime:
+     - `reference-to-video` expects plural `video_urls` (up to 5 clips, `@Video1`..`@Video5`), `image_urls` (up to 10, `@Image1`..`@Image10`), `audio_urls` (up to 5), `file_url`, and `link_url` (never singular `video_url`, which the API silently ignores).
+     - `image-to-video` accepts `image_url` (First Frame) and optional `end_image_url` (Last Frame).
+     - Supported `aspect_ratio` values are `["adaptive", "16:9", "4:3", "1:1", "3:4", "9:16"]` (default `"adaptive"`).
    - If the model has conditional payload rules (e.g., fields that should be stripped unless another field is set), update `sanitize_input_payload()` in `src/main.rs`.
 2. **Bilingual UI (`static/app.js` & `static/index.html`):**
    - The UI supports **Português (`pt-br`)** and **English (`en`)** via the `UI_I18N` dictionary, `FIELD_PT_BR`, `OPTION_PT_BR`, and `MODEL_PT_BR` maps in `static/app.js`.

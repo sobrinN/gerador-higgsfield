@@ -386,18 +386,18 @@
       badge: "Esquema Verificado",
       pricing_hint: "$0.020 - $0.080 / seg",
       description:
-        "Anima uma imagem inicial em um clipe de vídeo de 2 a 30s em 480p–1080p com áudio sincronizado.",
+        "Anima uma imagem inicial (com quadro final opcional) em um clipe de vídeo de 2 a 30s em 480p–1080p com áudio sincronizado.",
       verification_note:
-        "Verificado via Playground do Alibaba Wan 3.0 Image-to-Video ($0.02-$0.08/s, 2-30s).",
+        "Contrato documentado verificado via referência oficial da API Wan 3.0 Image-to-Video ($0.02-$0.08/s, 2-30s).",
     },
     "wan-3.0-r2v": {
       name: "Wan 3.0 · Referência para Vídeo",
       badge: "Esquema Verificado",
       pricing_hint: "$0.020 - $0.080 / seg",
       description:
-        "Gera vídeos de 2 a 30s guiados por imagens ou vídeo de referência em 480p–1080p.",
+        "Gera vídeos de 2 a 30s guiados por imagens (@Image1..10), vídeos (@Video1..5), áudios ou documentos de referência em 480p–1080p.",
       verification_note:
-        "Verificado via catálogo do Alibaba Wan 3.0 Reference-to-Video ($0.02-$0.08/s, 2-30s).",
+        "Contrato documentado verificado via referência oficial da API Wan 3.0 Reference-to-Video (suporta image_urls, video_urls, audio_urls, file_url, link_url).",
     },
     "wan-3.0-prime-t2v": {
       name: "Wan 3.0 Prime · Texto para Vídeo",
@@ -406,25 +406,25 @@
       description:
         "Modelo principal Wan 3.0 Prime de texto para vídeo de até 30s e 1080p com áudio nativo e modo raciocínio.",
       verification_note:
-        "Esquema exato verificado via Playground do Wan 3.0 Prime ($0.0272/s 480p, $0.056/s 720p, $0.112/s 1080p).",
+        "Esquema exato verificado via referência oficial da API Wan 3.0 Prime ($0.0272/s 480p, $0.056/s 720p, $0.112/s 1080p).",
     },
     "wan-3.0-prime-i2v": {
       name: "Wan 3.0 Prime · Imagem para Vídeo",
       badge: "Esquema Verificado",
       pricing_hint: "$0.0272 - $0.112 / seg",
       description:
-        "Anima uma imagem inicial em até 30s e 1080p usando o modelo Wan 3.0 Prime.",
+        "Anima uma imagem inicial (com quadro final opcional) em até 30s e 1080p usando o modelo Wan 3.0 Prime.",
       verification_note:
-        "Verificado via catálogo do Wan 3.0 Prime ($0.0272-$0.112/s, 2-30s).",
+        "Contrato documentado verificado via referência oficial da API Wan 3.0 Prime Image-to-Video ($0.0272-$0.112/s, 2-30s).",
     },
     "wan-3.0-prime-r2v": {
       name: "Wan 3.0 Prime · Referência para Vídeo",
       badge: "Esquema Verificado",
       pricing_hint: "$0.0272 - $0.112 / seg",
       description:
-        "Gera vídeos de 2 a 30s guiados por imagens ou vídeo de referência usando o Wan 3.0 Prime.",
+        "Gera vídeos de 2 a 30s guiados por imagens (@Image1..10), vídeos (@Video1..5), áudios ou documentos de referência usando o Wan 3.0 Prime.",
       verification_note:
-        "Verificado via catálogo do Wan 3.0 Prime ($0.0272-$0.112/s, 2-30s).",
+        "Contrato documentado verificado via referência oficial da API Wan 3.0 Prime Reference-to-Video (suporta image_urls, video_urls, audio_urls, file_url, link_url).",
     },
     "genjutsu-motion-transfer": {
       name: "Genjutsu · Transferência de Movimento",
@@ -644,17 +644,28 @@
     },
     image_urls: {
       label: "URLs das Imagens de Referência",
-      description: "URLs públicas de imagens de personagem, figurino, produto ou cenário.",
+      description:
+        "URLs públicas de imagens de personagem, figurino, produto ou cenário (referencie no prompt como @Image1, @Image2, etc.).",
     },
     audio_urls: {
-      label: "URLs de Áudio de Referência (Opcional, até 10 áudios)",
+      label: "URLs de Áudio de Referência (Opcional)",
       description:
-        "URLs públicas de arquivos de áudio (WAV/MP3/M4A, até 10 arquivos / 30s totais) para guiar voz, fala, música ou ritmo.",
+        "URLs públicas de arquivos de áudio (WAV/MP3, até 30s totais) para guiar voz, fala, música ou ritmo.",
     },
     video_urls: {
-      label: "URLs de Vídeo de Referência (Opcional, até 10 vídeos)",
+      label: "URLs de Vídeo de Referência (Opcional)",
       description:
-        "URLs públicas de vídeos de referência (MP4/MOV, até 10 vídeos / 30s totais) para condicionamento de movimento ou câmera.",
+        "URLs públicas de vídeos de referência (MP4/MOV, até 30s totais; referencie no prompt como @Video1, @Video2, etc.).",
+    },
+    file_url: {
+      label: "URL de Documento de Referência (Opcional)",
+      description:
+        "URL pública de um documento (docx/xlsx/pptx/pdf/md). Ativa automaticamente o Modo Raciocínio.",
+    },
+    link_url: {
+      label: "URL de Página Web de Referência (Opcional)",
+      description:
+        "URL pública de uma página web (não combinável com file_url). Ativa automaticamente o Modo Raciocínio.",
     },
     item_image_urls: {
       label: "URLs de Roupas / Itens (Apenas Humanos, até 3)",
@@ -2337,6 +2348,14 @@
           }
           state.formValues[field.name].push(val);
           urlInput.value = "";
+          if (field.field_type === "video_urls") {
+            probeVideoDuration(val, (_rawSec, billedSec) => {
+              if ("duration" in state.formValues) {
+                state.formValues.duration = billedSec;
+                renderFormFields();
+              }
+            });
+          }
           renderChips();
           onParametersChanged();
         });
@@ -2359,6 +2378,14 @@
         uploadBtn.addEventListener("click", () => fileInput.click());
 
         const handleMultipleFiles = async (files) => {
+          if (field.field_type === "video_urls" && files[0]) {
+            probeVideoDuration(files[0], (_rawSec, billedSec) => {
+              if ("duration" in state.formValues) {
+                state.formValues.duration = billedSec;
+                renderFormFields();
+              }
+            });
+          }
           uploadBtn.disabled = true;
           uploadBtn.textContent = t().uploading;
           try {
@@ -2517,13 +2544,16 @@
 
     const endpoint = getEffectiveEndpoint();
     if (
-      endpoint === "bytedance/seedance-2.5/reference-to-video" &&
+      endpoint.endsWith("reference-to-video") &&
       !useCustomJsonToggle.checked
     ) {
-      const hasAnyRef = ["image_urls", "audio_urls", "video_urls"].some(
+      const hasAnyArrayRef = ["image_urls", "audio_urls", "video_urls"].some(
         (k) => Array.isArray(payload[k]) && payload[k].length > 0
       );
-      if (!hasAnyRef) {
+      const hasAnyDocRef = ["file_url", "link_url"].some(
+        (k) => typeof payload[k] === "string" && payload[k].trim() !== ""
+      );
+      if (!hasAnyArrayRef && !hasAnyDocRef) {
         showFormError(t().missingR2vRefError);
         return;
       }

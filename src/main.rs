@@ -321,6 +321,12 @@ fn sanitize_input_payload(raw: &JsonValue) -> JsonValue {
         "cats" | "dogs" | "capybaras" | "birds" | "frogs" | "insects"
     );
 
+    let has_file_url = obj
+        .get("file_url")
+        .and_then(|v| v.as_str())
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+
     let mut cleaned = JsonValue::obj();
     for (k, v) in obj {
         if k.starts_with("__") {
@@ -328,6 +334,17 @@ fn sanitize_input_payload(raw: &JsonValue) -> JsonValue {
         }
         if k == "custom_reference_strength" && !has_custom_ref {
             continue;
+        }
+        if k == "link_url" && has_file_url {
+            // Wan 3.0 / 3.0 Prime: link_url is not combinable with file_url (file_url takes precedence)
+            continue;
+        }
+        if k == "seed" {
+            if let Some(n) = v.as_f64() {
+                if n <= 0.0 {
+                    continue;
+                }
+            }
         }
         if is_human_tier && (k == "body_color" || k == "pinned_species") {
             continue;
@@ -362,6 +379,34 @@ fn sanitize_input_payload(raw: &JsonValue) -> JsonValue {
     cleaned
 }
 
+/// Normalize endpoint-specific fields (e.g., promoting singular `video_url` into `video_urls`
+/// for `reference-to-video` endpoints so reference videos are never silently ignored).
+fn normalize_payload_for_endpoint(cleaned: &mut JsonValue, endpoint: &str) {
+    let clean_ep = endpoint.trim().trim_start_matches('/');
+    if clean_ep.ends_with("reference-to-video") {
+        let singular_vid = cleaned
+            .get("video_url")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        if let Some(vid_url) = singular_vid {
+            let mut arr = cleaned
+                .get("video_urls")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            if !arr.iter().any(|item| item.as_str() == Some(vid_url.as_str())) {
+                arr.push(JsonValue::Str(vid_url));
+            }
+            cleaned.insert("video_urls", JsonValue::Array(arr));
+            if let JsonValue::Object(ref mut map) = cleaned {
+                map.remove("video_url");
+            }
+        }
+    }
+}
+
 /// Prepare a payload specifically for `POST /estimate/<endpoint>` so that live cost calculation
 /// succeeds as soon as the user adjusts `resolution`, `duration`, `aspect_ratio`, `generate_audio`,
 /// or `batch_size`, even before they have typed a prompt or uploaded a reference file.
@@ -372,6 +417,7 @@ fn prepare_estimate_payload(
 ) -> JsonValue {
     let mut cleaned = sanitize_input_payload(raw);
     let clean_ep = endpoint.trim().trim_start_matches('/');
+    normalize_payload_for_endpoint(&mut cleaned, clean_ep);
 
     let is_missing_val = |v: Option<&JsonValue>| -> bool {
         match v {
@@ -936,21 +982,29 @@ fn handle_client(mut stream: TcpStream, state: Arc<AppState>) {
                 }
             }
 
-            let cleaned_input = sanitize_input_payload(&input);
-            if endpoint == "bytedance/seedance-2.5/reference-to-video" {
-                let has_refs = ["image_urls", "audio_urls", "video_urls"].iter().any(|k| {
+            let mut cleaned_input = sanitize_input_payload(&input);
+            normalize_payload_for_endpoint(&mut cleaned_input, &endpoint);
+            if endpoint.ends_with("reference-to-video") {
+                let has_array_refs = ["image_urls", "audio_urls", "video_urls"].iter().any(|k| {
                     cleaned_input
                         .get(k)
                         .and_then(|v| v.as_array())
                         .map(|a| !a.is_empty())
                         .unwrap_or(false)
                 });
-                if !has_refs {
+                let has_doc_refs = ["file_url", "link_url"].iter().any(|k| {
+                    cleaned_input
+                        .get(k)
+                        .and_then(|v| v.as_str())
+                        .map(|s| !s.trim().is_empty())
+                        .unwrap_or(false)
+                });
+                if !has_array_refs && !has_doc_refs {
                     send_json_response(
                         &mut stream,
                         400,
                         &json_err(
-                            "Seedance 2.5 Reference-to-Video requires at least one reference item in image_urls, audio_urls, or video_urls.",
+                            "Reference-to-Video requires at least one reference item in image_urls, video_urls, audio_urls, file_url, or link_url.",
                         ),
                     );
                     return;
@@ -1508,6 +1562,71 @@ mod tests {
             !edit.fields.iter().any(|f| f.name == "duration"),
             "seedance-2.5-edit must not send duration"
         );
+    }
+
+    #[test]
+    fn test_wan_3_0_schemas_and_r2v_video_urls_normalization() {
+        let catalog = get_bundled_catalog();
+
+        for id in ["wan-3.0-r2v", "wan-3.0-prime-r2v"] {
+            let entry = catalog.iter().find(|m| m.id == id).expect(id);
+            let names: Vec<&str> = entry.fields.iter().map(|f| f.name).collect();
+            assert!(
+                names.contains(&"video_urls"),
+                "{} must use plural video_urls (not video_url)",
+                id
+            );
+            assert!(
+                !names.contains(&"video_url"),
+                "{} must not use singular video_url",
+                id
+            );
+            assert!(names.contains(&"image_urls"));
+            assert!(names.contains(&"audio_urls"));
+            assert!(names.contains(&"file_url"));
+            assert!(names.contains(&"link_url"));
+
+            let ar_field = entry
+                .fields
+                .iter()
+                .find(|f| f.name == "aspect_ratio")
+                .expect("aspect_ratio field");
+            assert_eq!(ar_field.default_value.as_str(), Some("adaptive"));
+            let ar_opts: Vec<&str> = ar_field
+                .options
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|o| o.value)
+                .collect();
+            assert!(!ar_opts.contains(&"21:9"), "{} must not include unsupported 21:9", id);
+        }
+
+        for id in ["wan-3.0-i2v", "wan-3.0-prime-i2v"] {
+            let entry = catalog.iter().find(|m| m.id == id).expect(id);
+            let names: Vec<&str> = entry.fields.iter().map(|f| f.name).collect();
+            assert!(names.contains(&"image_url"));
+            assert!(names.contains(&"end_image_url"));
+        }
+
+        // Verify singular video_url is promoted to video_urls for reference-to-video endpoints
+        let raw = JsonValue::parse(
+            r#"{"prompt":"Edit @Video1","video_url":"https://example.com/ref.mp4","file_url":"https://example.com/doc.pdf","link_url":"https://example.com/page","seed":0}"#,
+        )
+        .unwrap();
+        let mut cleaned = sanitize_input_payload(&raw);
+        normalize_payload_for_endpoint(&mut cleaned, "alibaba/wan-3.0-prime/reference-to-video");
+        assert!(cleaned.get("video_url").is_none());
+        assert_eq!(
+            cleaned
+                .get("video_urls")
+                .and_then(|v| v.as_array())
+                .and_then(|a| a.first())
+                .and_then(|v| v.as_str()),
+            Some("https://example.com/ref.mp4")
+        );
+        assert!(cleaned.get("link_url").is_none());
+        assert!(cleaned.get("seed").is_none());
     }
 
     #[test]
