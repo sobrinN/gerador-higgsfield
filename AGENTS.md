@@ -118,7 +118,7 @@ gerador-higgsfield/
    - `1 Higgsfield Credit = $0.0625 USD` (`16 credits = $1.00 USD`).
    - `POST /estimate/<endpoint>` returns either:
      - `{"type":"estimate","credits":"...","usd":"...","discount":{"percentage":"15.00","credits":"...","usd":"..."}}` — where top-level `usd`/`credits` are the **net price charged** and `discount.usd`/`discount.credits` are the **savings subtracted**.
-     - `{"type":"description","pricing_description":"..."}` (for Genjutsu, Seedance 2.5, Wan 3.0, Cinema Studio 4.0) — where `calculateInstantTierCost()` computes the cost using `state.refVideoDuration` (auto-probed via HTML5 `<video preload="metadata">` on file drop/select or URL input) and applies the account discount (`state.accountDiscountPct`).
+     - `{"type":"description","pricing_description":"..."}` (for Genjutsu, Seedance 2.5, Wan 3.0, Cinema Studio 4.0) — where `calculateInstantTierCost()` computes the cost using `state.refVideoDuration` and `state.videoUrlDurations` (auto-probed via HTML5 `<video preload="metadata">` on file drop/select or URL input). For `reference-to-video`, `video-edit`, and `video-extend` with video inputs, total billable seconds = `output_duration + sum(input_video_durations)`.
 
 ---
 

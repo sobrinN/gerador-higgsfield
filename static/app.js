@@ -13,6 +13,7 @@
     formValues: {},
     refVideoDuration: 5,
     refVideoRawDuration: null,
+    videoUrlDurations: {},
     accountDiscountPct: 15,
     activeCodeTab: "json",
     jobs: [],
@@ -67,7 +68,8 @@
       syncingEstimate: "Sincronizando /estimate...",
       verifiedAccountQuote: "Cotação Verificada da Conta",
       verifiedRateTable: "Tabela Verificada /estimate",
-      accountQuoteDiscount: (pct) => `Cotação da Conta (${pct}% off)`,
+      accountQuoteDiscount: (pct) =>
+        `Cotação da Conta (${String(pct).replace(/%+$/, "")}% off)`,
       creditsUnit: "créditos",
       billingFootnote:
         "Apenas execuções <code>completed</code> consomem créditos · <code>failed</code>, <code>nsfw</code> e <code>canceled</code> na fila são estornados · retenção de 7+ dias na CDN",
@@ -169,6 +171,8 @@
       breakdownSoundOff: "sem som",
       breakdownCharLock: "trava de personagem",
       breakdownSheet: "folha 2K · 16:9",
+      breakdownOutPlusRef: (outSec, refSec, totalSec) =>
+        `${outSec}s saída + ${refSec}s ref (${totalSec}s)`,
       refVideoDurationLabel: "Duração do Vídeo Fonte (p/ cálculo de custo)",
       refVideoDetectedBadge: (rawSec, billedSec) =>
         `Detectado do vídeo: ${rawSec.toFixed(1)}s → ${billedSec}s cobrados`,
@@ -226,7 +230,8 @@
       syncingEstimate: "Syncing /estimate...",
       verifiedAccountQuote: "Verified Account Quote",
       verifiedRateTable: "Verified /estimate Rate",
-      accountQuoteDiscount: (pct) => `Account Quote (${pct}% off)`,
+      accountQuoteDiscount: (pct) =>
+        `Account Quote (${String(pct).replace(/%+$/, "")}% off)`,
       creditsUnit: "credits",
       billingFootnote:
         "Only <code>completed</code> runs spend credits · <code>failed</code>, <code>nsfw</code> &amp; queued <code>canceled</code> runs auto-refund · 7-day CDN retention",
@@ -328,6 +333,8 @@
       breakdownSoundOff: "sound off",
       breakdownCharLock: "character lock",
       breakdownSheet: "2K · 16:9 sheet",
+      breakdownOutPlusRef: (outSec, refSec, totalSec) =>
+        `${outSec}s out + ${refSec}s ref (${totalSec}s)`,
       refVideoDurationLabel: "Source Video Duration (for cost estimate)",
       refVideoDetectedBadge: (rawSec, billedSec) =>
         `Detected from video: ${rawSec.toFixed(1)}s → ${billedSec}s billed`,
@@ -677,7 +684,7 @@
     video_urls: {
       label: "URLs de Vídeo de Referência (Opcional)",
       description:
-        "URLs públicas de vídeos de referência (MP4/MOV, até 30s totais; referencie no prompt como @Video1, @Video2, etc.).",
+        "URLs públicas de vídeos de referência (MP4/MOV, até 30s totais; referencie como @Video1, @Video2, etc. Nota: a cobrança soma a duração de saída + duração dos vídeos de referência).",
     },
     file_url: {
       label: "URL de Documento de Referência (Opcional)",
@@ -1290,9 +1297,12 @@
     const applyDetected = () => {
       if (Number.isFinite(video.duration) && video.duration > 0) {
         const rawSec = video.duration;
-        const billedSec = Math.min(30, Math.max(4, Math.ceil(rawSec)));
+        const billedSec = Math.min(30, Math.max(2, Math.round(rawSec)));
         state.refVideoRawDuration = rawSec;
         state.refVideoDuration = billedSec;
+        if (typeof source === "string") {
+          state.videoUrlDurations[source] = rawSec;
+        }
         if (onUpdated) onUpdated(rawSec, billedSec);
         onParametersChanged();
       }
@@ -1404,6 +1414,38 @@
     return out;
   }
 
+  function getSingleVideoBilledSeconds() {
+    const v = state.formValues;
+    if (typeof v.video_url === "string" && v.video_url.trim() !== "") {
+      const urlKey = v.video_url.trim();
+      const raw = state.videoUrlDurations[urlKey] ?? state.refVideoRawDuration;
+      return Number.isFinite(raw) && raw > 0
+        ? Math.max(1, Math.round(raw))
+        : Math.max(1, Math.round(state.refVideoDuration || 5));
+    }
+    return 0;
+  }
+
+  function getMultiVideosBilledSeconds() {
+    const v = state.formValues;
+    let totalRefSec = 0;
+    if (Array.isArray(v.video_urls) && v.video_urls.length > 0) {
+      for (const u of v.video_urls) {
+        const raw = state.videoUrlDurations[u];
+        const sec =
+          Number.isFinite(raw) && raw > 0
+            ? Math.max(1, Math.round(raw))
+            : Math.max(1, Math.round(state.refVideoDuration || 5));
+        totalRefSec += sec;
+      }
+    }
+    return totalRefSec;
+  }
+
+  function getInputVideosBilledSeconds() {
+    return getSingleVideoBilledSeconds() + getMultiVideosBilledSeconds();
+  }
+
   /**
    * 0ms Instant Local Tier Cost Calculator
    * 1 Higgsfield Credit = $0.0625 USD (16 credits = $1.00 USD)
@@ -1414,6 +1456,7 @@
     const v = state.formValues;
     const duration = Math.max(1, Number(v.duration) || 5);
     const refSec = Math.min(30, Math.max(4, Number(state.refVideoDuration) || 5));
+    const inputVideoSec = getInputVideosBilledSeconds();
     const res = String(v.resolution || "720p").toLowerCase();
     const audioOn = v.generate_audio !== false;
     const bitrate = String(v.bitrate_mode || "high").toLowerCase();
@@ -1446,49 +1489,91 @@
       endpoint.includes("seedance-2.5/video-edit") ||
       endpoint.includes("seedance-2.5/video-extend")
     ) {
-      const baseRatePerSec =
+      const singleVidSec = getSingleVideoBilledSeconds();
+      const multiVidSec = getMultiVideosBilledSeconds();
+      const isEdit = endpoint.includes("video-edit");
+      const isExtend = endpoint.includes("video-extend");
+      const hasVideoRef = isEdit || isExtend || inputVideoSec > 0;
+      // When video inputs are provided, Seedance 2.5 multiplies the per-second rate by 0.6×
+      // and bills (input_video_duration + generated_video_duration).
+      const noVideoRatePerSec =
         res === "480p" ? 0.1728 : res === "1080p" ? 0.796 : 0.382;
+      const ratePerSec = hasVideoRef ? noVideoRatePerSec * 0.6 : noVideoRatePerSec;
       const audioMult = audioOn ? 1.0 : 0.88;
       const bitMult = bitrate === "standard" ? 0.92 : 1.0;
-      const effectiveSec =
-        endpoint.includes("video-edit") && state.refVideoRawDuration !== null
-          ? refSec
-          : duration;
-      usd = baseRatePerSec * audioMult * bitMult * effectiveSec;
+      const primarySrcSec = singleVidSec > 0 ? singleVidSec : refSec;
+      const outSec = isEdit ? primarySrcSec : duration;
+      const totalInputSec =
+        isEdit || isExtend ? primarySrcSec + multiVidSec : inputVideoSec;
+      const totalBillableSec = hasVideoRef ? outSec + totalInputSec : outSec;
+      usd = ratePerSec * audioMult * bitMult * totalBillableSec;
       credits = usd / CREDIT_USD;
       parts.push(
-        `${effectiveSec}s`,
+        hasVideoRef
+          ? dict.breakdownOutPlusRef(outSec, totalInputSec, totalBillableSec)
+          : `${outSec}s`,
         res,
         audioOn ? dict.breakdownAudioOn : dict.breakdownAudioOff
       );
       if (v.output_format) parts.push(String(v.output_format).toUpperCase());
     } else if (endpoint.includes("wan-3.0-prime")) {
+      // Wan 3.0 Prime rates (60% off list $0.068 / $0.14 / $0.28):
+      // reference-to-video bills output duration + sum of input reference video durations.
       const ratePerSec =
         res === "480p" ? 0.0272 : res === "720p" ? 0.056 : 0.112;
-      usd = ratePerSec * duration;
+      const listRatePerSec =
+        res === "480p" ? 0.068 : res === "720p" ? 0.14 : 0.28;
+      const isR2vWithVideo =
+        endpoint.includes("reference-to-video") && inputVideoSec > 0;
+      const totalBillableSec = isR2vWithVideo
+        ? duration + inputVideoSec
+        : duration;
+      const listUsd = listRatePerSec * totalBillableSec;
+      usd = ratePerSec * totalBillableSec;
       credits = usd / CREDIT_USD;
       parts.push(
-        `${duration}s`,
+        isR2vWithVideo
+          ? dict.breakdownOutPlusRef(duration, inputVideoSec, totalBillableSec)
+          : `${duration}s`,
         res,
-        audioOn ? dict.breakdownAudioOn : dict.breakdownAudioOff
+        audioOn ? dict.breakdownAudioOn : dict.breakdownAudioOff,
+        dict.beforeDiscountList(`$${listUsd.toFixed(2)}`)
       );
       if (v.enable_thinking) parts.push(dict.breakdownThinkingOn);
     } else if (endpoint.includes("wan-3.0")) {
+      // Wan 3.0 rates (60% off list $0.05 / $0.10 / $0.20):
+      // reference-to-video bills output duration + sum of input reference video durations.
       const ratePerSec =
         res === "480p" ? 0.02 : res === "1080p" ? 0.08 : 0.04;
-      usd = ratePerSec * duration;
+      const listRatePerSec =
+        res === "480p" ? 0.05 : res === "1080p" ? 0.2 : 0.1;
+      const isR2vWithVideo =
+        endpoint.includes("reference-to-video") && inputVideoSec > 0;
+      const totalBillableSec = isR2vWithVideo
+        ? duration + inputVideoSec
+        : duration;
+      const listUsd = listRatePerSec * totalBillableSec;
+      usd = ratePerSec * totalBillableSec;
       credits = usd / CREDIT_USD;
       parts.push(
-        `${duration}s`,
+        isR2vWithVideo
+          ? dict.breakdownOutPlusRef(duration, inputVideoSec, totalBillableSec)
+          : `${duration}s`,
         res,
-        audioOn ? dict.breakdownAudioOn : dict.breakdownAudioOff
+        audioOn ? dict.breakdownAudioOn : dict.breakdownAudioOff,
+        dict.beforeDiscountList(`$${listUsd.toFixed(2)}`)
       );
       if (v.enable_thinking) parts.push(dict.breakdownThinkingOn);
     } else if (endpoint.includes("genjutsu/restyle")) {
       // Official Genjutsu Restyle rate: 5.09 cr/s (480p), 10.90 cr/s (720p), 26.11 cr/s (1080p)
+      // Genjutsu rounds input duration up to the nearest whole second.
+      const genjutsuSec =
+        state.refVideoRawDuration !== null
+          ? Math.min(30, Math.max(4, Math.ceil(state.refVideoRawDuration)))
+          : refSec;
       const listCreditsPerSec =
         res === "480p" ? 5.09 : res === "1080p" ? 26.11 : 10.9;
-      const listCredits = listCreditsPerSec * refSec;
+      const listCredits = listCreditsPerSec * genjutsuSec;
       const listUsd = listCredits * CREDIT_USD;
       const discMult =
         state.hasKey && state.accountDiscountPct > 0
@@ -1497,7 +1582,9 @@
       usd = listUsd * discMult;
       credits = listCredits * discMult;
       parts.push(
-        state.refVideoRawDuration !== null ? `${refSec}s ref` : `~${refSec}s ref`,
+        state.refVideoRawDuration !== null
+          ? `${genjutsuSec}s ref`
+          : `~${genjutsuSec}s ref`,
         res
       );
       if (discMult < 1.0) {
@@ -1505,9 +1592,14 @@
       }
     } else if (endpoint.includes("genjutsu")) {
       // Official Genjutsu Motion Transfer & Object Swap rate: 2.544 cr/s (480p), 5.43 cr/s (720p), 13.056 cr/s (1080p)
+      // Genjutsu rounds input duration up to the nearest whole second.
+      const genjutsuSec =
+        state.refVideoRawDuration !== null
+          ? Math.min(30, Math.max(4, Math.ceil(state.refVideoRawDuration)))
+          : refSec;
       const listCreditsPerSec =
         res === "480p" ? 2.544 : res === "1080p" ? 13.056 : 5.43;
-      const listCredits = listCreditsPerSec * refSec;
+      const listCredits = listCreditsPerSec * genjutsuSec;
       const listUsd = listCredits * CREDIT_USD;
       const discMult =
         state.hasKey && state.accountDiscountPct > 0
@@ -1516,7 +1608,9 @@
       usd = listUsd * discMult;
       credits = listCredits * discMult;
       parts.push(
-        state.refVideoRawDuration !== null ? `${refSec}s ref` : `~${refSec}s ref`,
+        state.refVideoRawDuration !== null
+          ? `${genjutsuSec}s ref`
+          : `~${genjutsuSec}s ref`,
         res
       );
       if (discMult < 1.0) {
@@ -1541,10 +1635,23 @@
       credits = 40.0;
       parts.push(dict.breakdownCharLock);
     } else if (endpoint.includes("cinema-studio")) {
-      const ratePerSec = res === "480p" ? 0.2057 : 0.4623;
-      usd = ratePerSec * duration;
+      // Cinema Studio 4.0: with video references, rate is 0.6× standard rate and
+      // both input and generated video durations are billable.
+      const baseRatePerSec = res === "480p" ? 0.2057 : 0.4623;
+      const hasVideoRef = inputVideoSec > 0;
+      const ratePerSec = hasVideoRef ? baseRatePerSec * 0.6 : baseRatePerSec;
+      const totalBillableSec = hasVideoRef
+        ? duration + inputVideoSec
+        : duration;
+      usd = ratePerSec * totalBillableSec;
       credits = usd / CREDIT_USD;
-      parts.push(`${duration}s`, res, String(v.aspect_ratio || "16:9"));
+      parts.push(
+        hasVideoRef
+          ? dict.breakdownOutPlusRef(duration, inputVideoSec, totalBillableSec)
+          : `${duration}s`,
+        res,
+        String(v.aspect_ratio || "16:9")
+      );
     } else if (endpoint.includes("kling-video/v3.0")) {
       const soundOn = String(v.sound || "on") === "on";
       const ratePerSec = soundOn ? 0.1428 : 0.0952;
@@ -1716,9 +1823,11 @@
         if (!state.isSubmitting && submitBtnText) {
           submitBtnText.textContent = `${dict.generateMedia} · ${est.usdStr}`;
         }
+        const isWan = endpoint.includes("wan-3.0");
+        const effectivePct = isWan ? 60 : state.accountDiscountPct;
         liveCostSourceBadge.textContent =
-          state.accountDiscountPct > 0
-            ? dict.accountQuoteDiscount(`${state.accountDiscountPct}%`)
+          effectivePct > 0
+            ? dict.accountQuoteDiscount(effectivePct)
             : dict.verifiedRateTable;
         liveCostSourceBadge.className = "live-cost-source-badge verified-api";
         if (data.pricing_description) {
@@ -2173,8 +2282,9 @@
           state.formValues[field.name] = val;
           updateThumb(val);
           if (field.field_type === "video_url" && val) {
+            const isExtend = getEffectiveEndpoint().includes("video-extend");
             probeVideoDuration(val, (_rawSec, billedSec) => {
-              if ("duration" in state.formValues) {
+              if ("duration" in state.formValues && !isExtend) {
                 state.formValues.duration = billedSec;
                 syncDurationFieldInDOM(billedSec);
               }
@@ -2201,10 +2311,13 @@
         uploadBtn.addEventListener("click", () => fileInput.click());
 
         const handleSingleFile = async (file) => {
+          let probedRawSec = null;
           if (field.field_type === "video_url") {
+            const isExtend = getEffectiveEndpoint().includes("video-extend");
             // Immediately probe local video metadata (0ms) before upload completes
-            probeVideoDuration(file, (_rawSec, billedSec) => {
-              if ("duration" in state.formValues) {
+            probeVideoDuration(file, (rawSec, billedSec) => {
+              probedRawSec = rawSec;
+              if ("duration" in state.formValues && !isExtend) {
                 state.formValues.duration = billedSec;
                 syncDurationFieldInDOM(billedSec);
               }
@@ -2215,6 +2328,9 @@
           uploadBtn.textContent = dict.uploading;
           try {
             const publicUrl = await uploadReferenceFile(file);
+            if (probedRawSec !== null) {
+              state.videoUrlDurations[publicUrl] = probedRawSec;
+            }
             state.formValues[field.name] = publicUrl;
             input.value = publicUrl;
             updateThumb(publicUrl);
@@ -2411,6 +2527,13 @@
               leftGroup.appendChild(durBadge);
               vidEl.addEventListener("loadedmetadata", () => {
                 if (Number.isFinite(vidEl.duration) && vidEl.duration > 0) {
+                  const prevDur = state.videoUrlDurations[urlStr];
+                  state.videoUrlDurations[urlStr] = vidEl.duration;
+                  state.refVideoRawDuration = vidEl.duration;
+                  state.refVideoDuration = Math.min(
+                    30,
+                    Math.max(2, Math.round(vidEl.duration))
+                  );
                   durBadge.textContent = `${vidEl.duration.toFixed(1)}s`;
                   durBadge.hidden = false;
                   if (vidEl.duration > 30) {
@@ -2419,6 +2542,12 @@
                       state.lang === "pt-br"
                         ? "Limite máximo de referência é 30s totais"
                         : "Max reference video limit is 30s total";
+                  }
+                  if (
+                    prevDur === undefined ||
+                    Math.round(prevDur) !== Math.round(vidEl.duration)
+                  ) {
+                    onParametersChanged();
                   }
                 }
               });
@@ -2492,12 +2621,16 @@
         uploadBtn.addEventListener("click", () => fileInput.click());
 
         const handleMultipleFiles = async (files) => {
-          if (field.field_type === "video_urls" && files[0]) {
-            probeVideoDuration(files[0], (_rawSec, billedSec) => {
-              if ("duration" in state.formValues) {
-                state.formValues.duration = billedSec;
-                syncDurationFieldInDOM(billedSec);
-              }
+          const localFileDurations = new Map();
+          if (field.field_type === "video_urls") {
+            files.forEach((f, idx) => {
+              probeVideoDuration(f, (rawSec, billedSec) => {
+                localFileDurations.set(f, rawSec);
+                if (idx === 0 && "duration" in state.formValues) {
+                  state.formValues.duration = billedSec;
+                  syncDurationFieldInDOM(billedSec);
+                }
+              });
             });
           }
           uploadBtn.disabled = true;
@@ -2505,6 +2638,9 @@
           try {
             for (const f of files) {
               const publicUrl = await uploadReferenceFile(f);
+              if (localFileDurations.has(f)) {
+                state.videoUrlDurations[publicUrl] = localFileDurations.get(f);
+              }
               if (!Array.isArray(state.formValues[field.name])) {
                 state.formValues[field.name] = [];
               }

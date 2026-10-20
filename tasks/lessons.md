@@ -48,5 +48,11 @@
 - **Root Cause:** When uploading local files in `video_urls` (`handleMultipleFiles`), `probeVideoDuration(files[0])` reads local `Blob` metadata in ~5–15ms while `await uploadReferenceFile(f)` is still uploading to `/api/upload` + S3/R2 (~1–3s). Calling `renderFormFields()` inside `probeVideoDuration`'s callback wipes `dynamicFieldsContainer.innerHTML = ""` mid-upload. When `uploadReferenceFile` resolves afterward, `state.formValues.video_urls.push(publicUrl)` succeeds (and the toast fires), but `renderChips()` mutates the **detached `listContainer` DOM node** from before `renderFormFields()`, leaving the visible dropzone empty on screen.
 - **Solution:** Never call `renderFormFields()` from async metadata probes; update the duration slider/badge/preset chips in-place via `syncDurationFieldInDOM(billedSec)`, and render visual `@Video1` / `@Image1` / `@Audio1` chips with media thumbnails and duration badges inside `listContainer`.
 
+## 7. `reference-to-video` Billing Rule (`output_duration + sum(input_video_durations)`) & Rounding
+- **Root Cause:** On `alibaba/wan-3.0/reference-to-video`, `alibaba/wan-3.0-prime/reference-to-video`, and `bytedance/seedance-2.5/reference-to-video` / `video-edit` / `video-extend`, Higgsfield bills **total video seconds = `output_duration + sum(input_reference_video_durations)`** when reference videos are attached (whereas image/audio references do not add billable seconds). Calculating only `ratePerSec * duration` underestimates the cost by ~2× whenever `@Video1` has the same length as the output clip (e.g., `14s` output + `13s` `@Video1` = `27s × $0.04/s = $1.08`, whereas output-only showed `$0.56`).
+- **Duration Rounding:** Container audio/video alignment often makes a `13.0s` MP4 report `13.01s–13.04s` in HTML5 `video.duration`. Using `Math.ceil(rawSec)` inflated `13.02s` to `14s` when syncing the output `duration` slider. Use `Math.round(rawSec)` so `13.02s` stays `13s`.
+- **Analytics Request Count vs. Spend:** Higgsfield's Analytics dashboard counts all submitted requests in an hourly bucket (including `nsfw` and `failed` requests that cost `$0.00`) alongside the total spend from `completed` requests.
+
+
 
 
